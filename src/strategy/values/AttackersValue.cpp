@@ -180,8 +180,9 @@ bool AttackersValue::IsPossibleTarget(Unit* attacker, Player* bot, float /*range
     if (!bot->CanSeeOrDetect(attacker))
         return false;
 
-    // PvP prohibition checks
+    // PvP prohibition checks (skip for duel opponents)
     if ((attacker->GetGUID().IsPlayer() || attacker->GetGUID().IsPet()) &&
+        (!bot->duel || bot->duel->Opponent != attacker) &&
         (sPlayerbotAIConfig->IsPvpProhibited(attacker->GetZoneId(), attacker->GetAreaId(), bot) ||
         sPlayerbotAIConfig->IsPvpProhibited(bot->GetZoneId(), bot->GetAreaId(), bot)))
     {

@@ -135,7 +135,8 @@ bool PetsAction::Execute(Event event)
             return false;
         }
         if (sPlayerbotAIConfig->IsPvpProhibited(bot->GetZoneId(), bot->GetAreaId(), bot)
-            && (targetUnit->IsPlayer() || targetUnit->IsPet()))
+            && (targetUnit->IsPlayer() || targetUnit->IsPet())
+            && (!bot->duel || bot->duel->Opponent != targetUnit))
         {
             botAI->TellError("I cannot command my pet to attack players in PvP prohibited areas.");
             return false;
