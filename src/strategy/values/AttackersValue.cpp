@@ -180,10 +180,11 @@ bool AttackersValue::IsPossibleTarget(Unit* attacker, Player* bot, float /*range
     if (!bot->CanSeeOrDetect(attacker))
         return false;
 
-    // PvP prohibition checks
+    // PvP prohibition checks (skip for duel opponents)
     if ((attacker->GetGUID().IsPlayer() || attacker->GetGUID().IsPet()) &&
-        (sPlayerbotAIConfig->IsPvpProhibited(attacker->GetZoneId(), attacker->GetAreaId()) ||
-        sPlayerbotAIConfig->IsPvpProhibited(bot->GetZoneId(), bot->GetAreaId())))
+        (!bot->duel || bot->duel->Opponent != attacker) &&
+        (sPlayerbotAIConfig->IsPvpProhibited(attacker->GetZoneId(), attacker->GetAreaId(), bot) ||
+        sPlayerbotAIConfig->IsPvpProhibited(bot->GetZoneId(), bot->GetAreaId(), bot)))
     {
         // This will stop aggresive pets from starting an attack.
         // This will stop currently attacking pets from continuing their attack.
