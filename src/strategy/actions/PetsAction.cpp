@@ -156,18 +156,12 @@ bool PetsAction::Execute(Event event)
             botAI->TellError(text);
             return false;
         }
-        if (sPlayerbotAIConfig->IsPvpProhibited(bot->GetZoneId(), bot->GetAreaId())
-            && (targetUnit->IsPlayer() || targetUnit->IsPet()))
+        if (sPlayerbotAIConfig->IsPvpProhibited(bot->GetZoneId(), bot->GetAreaId(), bot) &&
+            (targetUnit->IsPlayer() || targetUnit->IsPet()))
         {
             std::string text = sPlayerbotTextMgr->GetBotTextOrDefault(
                 "pet_pvp_prohibited_error", "I cannot command my pet to attack players in PvP prohibited areas.", {});
             botAI->TellError(text);
-            return false;
-        }
-        if (sPlayerbotAIConfig->IsPvpProhibited(bot->GetZoneId(), bot->GetAreaId(), bot)
-            && (targetUnit->IsPlayer() || targetUnit->IsPet()))
-        {
-            botAI->TellError("I cannot command my pet to attack players in PvP prohibited areas.");
             return false;
         }
 
