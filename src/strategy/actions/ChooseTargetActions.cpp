@@ -19,7 +19,7 @@ bool AttackEnemyPlayerAction::isUseful()
     if (PlayerHasFlag::IsCapturingFlag(bot))
         return false;
 
-    return !sPlayerbotAIConfig->IsPvpProhibited(bot->GetZoneId(), bot->GetAreaId());
+    return !sPlayerbotAIConfig->IsPvpProhibited(bot->GetZoneId(), bot->GetAreaId(), bot);
 }
 
 bool AttackEnemyFlagCarrierAction::isUseful()

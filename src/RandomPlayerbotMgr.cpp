@@ -2007,7 +2007,11 @@ void RandomPlayerbotMgr::PrepareTeleportCache()
                     {
                         allianceFlightMasterCache.push_back(guid);
                     }
+                    flightMastersByMap[mapId].push_back(WorldPosition(mapId, x, y, z));
                 }
+                if (tNpcflag & UNIT_NPC_FLAG_INNKEEPER)
+                    innkeepersByMap[mapId].push_back(WorldPosition(mapId, x, y, z));
+
                 const AreaTableEntry* area = sAreaTableStore.LookupEntry(map->GetAreaId(PHASEMASK_NORMAL, x, y, z));
                 uint32 zoneId = area->zone ? area->zone : area->ID;
                 if (zone2LevelBracket.find(zoneId) == zone2LevelBracket.end())
