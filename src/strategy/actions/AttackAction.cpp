@@ -15,20 +15,19 @@
 #include "SharedDefines.h"
 #include "Unit.h"
 
-bool AttackAction::Execute(Event event)
+bool AttackAction::Execute(Event /*event*/)
 {
     Unit* target = GetTarget();
     if (!target)
         return false;
 
     if (!target->IsInWorld())
-    {
         return false;
-    }
+
     return Attack(target);
 }
 
-bool AttackMyTargetAction::Execute(Event event)
+bool AttackMyTargetAction::Execute(Event /*event*/)
 {
     Player* master = GetMaster();
     if (!master)
@@ -51,7 +50,7 @@ bool AttackMyTargetAction::Execute(Event event)
     return result;
 }
 
-bool AttackAction::Attack(Unit* target, bool with_pet /*true*/)
+bool AttackAction::Attack(Unit* target, bool /*with_pet*/ /*true*/)
 {
     Unit* oldTarget = context->GetValue<Unit*>("current target")->Get();
     bool shouldMelee = bot->IsWithinMeleeRange(target) || botAI->IsMelee(bot);
@@ -81,6 +80,7 @@ bool AttackAction::Attack(Unit* target, bool with_pet /*true*/)
     {
         if (verbose)
             botAI->TellError(std::string(target->GetName()) + " is no longer in the world.");
+
         return false;
     }
 
@@ -125,6 +125,7 @@ bool AttackAction::Attack(Unit* target, bool with_pet /*true*/)
     {
         if (verbose)
             botAI->TellError(std::string(target->GetName()) + " is friendly to me.");
+
         return false;
     }
 
@@ -132,6 +133,7 @@ bool AttackAction::Attack(Unit* target, bool with_pet /*true*/)
     {
         if (verbose)
             botAI->TellError(std::string(target->GetName()) + " is dead.");
+
         return false;
     }
 
@@ -139,6 +141,7 @@ bool AttackAction::Attack(Unit* target, bool with_pet /*true*/)
     {
         if (verbose)
             botAI->TellError(std::string(target->GetName()) + " is not in my sight.");
+
         return false;
     }
 
@@ -146,6 +149,7 @@ bool AttackAction::Attack(Unit* target, bool with_pet /*true*/)
     {
         if (verbose)
             botAI->TellError("I am already attacking " + std::string(target->GetName()) + ".");
+
         return false;
     }
 
@@ -181,9 +185,8 @@ bool AttackAction::Attack(Unit* target, bool with_pet /*true*/)
     }
 
     if (IsMovingAllowed() && !bot->HasInArc(CAST_ANGLE_IN_FRONT, target))
-    {
         sServerFacade->SetFacingTo(bot, target);
-    }
+
     botAI->ChangeEngine(BOT_STATE_COMBAT);
 
     bot->Attack(target, shouldMelee);
@@ -213,4 +216,4 @@ bool AttackAction::Attack(Unit* target, bool with_pet /*true*/)
 
 bool AttackDuelOpponentAction::isUseful() { return AI_VALUE(Unit*, "duel target"); }
 
-bool AttackDuelOpponentAction::Execute(Event event) { return Attack(AI_VALUE(Unit*, "duel target")); }
+bool AttackDuelOpponentAction::Execute(Event /*event*/) { return Attack(AI_VALUE(Unit*, "duel target")); }

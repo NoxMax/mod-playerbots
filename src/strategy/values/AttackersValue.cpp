@@ -33,18 +33,14 @@ GuidVector AttackersValue::Calculate()
     {
         Unit* unit = botAI->GetUnit(target);
         if (unit && IsValidTarget(unit, bot))
-        {
             targets.insert(unit);
-        }
     }
     if (Group* group = bot->GetGroup())
     {
         ObjectGuid skullGuid = group->GetTargetIcon(7);
         Unit* skullTarget = botAI->GetUnit(skullGuid);
         if (skullTarget && IsValidTarget(skullTarget, bot))
-        {
             targets.insert(skullTarget);
-        }
     }
 
     for (Unit* unit : targets)
@@ -61,9 +57,7 @@ GuidVector AttackersValue::Calculate()
         {
             Unit* unit = botAI->GetUnit(guid);
             if (unit && unit->IsPlayer() && IsValidTarget(unit, bot))
-            {
                 result.push_back(unit->GetGUID());
-            }
         }
     }
 
@@ -110,9 +104,8 @@ void AttackersValue::AddAttackersOf(Player* player, std::unordered_set<Unit*>& t
 
         if (player->IsValidAttackTarget(attacker) &&
             player->GetDistance2d(attacker) < sPlayerbotAIConfig->sightDistance)
-        {
             targets.insert(attacker);
-        }
+
         ref = ref->next();
     }
 }
@@ -180,10 +173,11 @@ bool AttackersValue::IsPossibleTarget(Unit* attacker, Player* bot, float /*range
     if (!bot->CanSeeOrDetect(attacker))
         return false;
 
-    // PvP prohibition checks
+    // PvP prohibition checks (skip for duels)
     if ((attacker->GetGUID().IsPlayer() || attacker->GetGUID().IsPet()) &&
+        (!bot->duel || bot->duel->Opponent != attacker) &&
         (sPlayerbotAIConfig->IsPvpProhibited(attacker->GetZoneId(), attacker->GetAreaId(), bot) ||
-        sPlayerbotAIConfig->IsPvpProhibited(bot->GetZoneId(), bot->GetAreaId(), bot)))
+        sPlayerbotAIConfig->IsPvpProhibited(bot->GetZoneId(), bot->GetAreaId())))
     {
         // This will stop aggresive pets from starting an attack.
         // This will stop currently attacking pets from continuing their attack.
