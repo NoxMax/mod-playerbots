@@ -14,6 +14,7 @@
 #include "AutoMaintenanceOnLevelupAction.h"
 #include "BattleGroundJoinAction.h"
 #include "BattleGroundTactics.h"
+#include "BattlefieldTactics.h"
 #include "BuyAction.h"
 #include "CastCustomSpellAction.h"
 #include "ChangeStrategyAction.h"
@@ -228,6 +229,12 @@ public:
         creators["attack enemy flag carrier"] = &ActionContext::attack_enemy_fc;
         creators["bg check flag"] = &ActionContext::bg_check_flag;
 
+        // Battlefield (Wintergrasp) Tactics
+        creators["wg check flag"] = &ActionContext::wg_check_flag;
+        creators["wg summon vehicle"] = &ActionContext::wg_summon_vehicle;
+        creators["wg mount tower cannon"] = &ActionContext::wg_mount_tower_cannon;
+        creators["wg fire cannon"] = &ActionContext::wg_fire_cannon;
+
         // Vehicles
         creators["enter vehicle"] = &ActionContext::enter_vehicle;
         creators["leave vehicle"] = &ActionContext::leave_vehicle;
@@ -434,6 +441,12 @@ private:
     static Action* attack_enemy_fc(PlayerbotAI* botAI) { return new AttackEnemyFlagCarrierAction(botAI); }
     static Action* bg_use_buff(PlayerbotAI* botAI) { return new BGTactics(botAI, "use buff"); }
     static Action* bg_check_flag(PlayerbotAI* botAI) { return new BGTactics(botAI, "check flag"); }
+
+    // Battlefield (Wintergrasp) Tactics
+    static Action* wg_check_flag(PlayerbotAI* botAI) { return new WgCheckFlagAction(botAI); }
+    static Action* wg_summon_vehicle(PlayerbotAI* botAI) { return new WgSummonVehicleAction(botAI); }
+    static Action* wg_mount_tower_cannon(PlayerbotAI* botAI) { return new WgMountTowerCannonAction(botAI); }
+    static Action* wg_fire_cannon(PlayerbotAI* botAI) { return new WgFireCannonAction(botAI); }
 
     // Vehicles
     static Action* enter_vehicle(PlayerbotAI* botAI) { return new EnterVehicleAction(botAI); }

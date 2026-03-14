@@ -362,6 +362,7 @@ bool PlayerbotAIConfig::Initialize()
 
     randomBotJoinBG = sConfigMgr->GetOption<bool>("AiPlayerbot.RandomBotJoinBG", true);
     randomBotAutoJoinBG = sConfigMgr->GetOption<bool>("AiPlayerbot.RandomBotAutoJoinBG", false);
+    randomBotJoinBF = sConfigMgr->GetOption<bool>("AiPlayerbot.RandomBotJoinBF", true);
 
     randomBotAutoJoinArenaBracket = sConfigMgr->GetOption<int32>("AiPlayerbot.RandomBotAutoJoinArenaBracket", 14);
 

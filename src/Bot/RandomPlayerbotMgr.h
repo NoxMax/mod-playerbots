@@ -151,6 +151,7 @@ public:
     std::map<uint32, std::map<uint32, std::map<uint32, uint32>>> Supporters;
     std::map<TeamId, std::vector<uint32>> LfgDungeons;
     void CheckBgQueue();
+    void CheckWgQueue();
     void CheckLfgQueue();
     void CheckPlayers();
     void LogBattlegroundInfo();
@@ -202,6 +203,8 @@ private:
         }
 
         this->BgCheckTimer = 0;
+        this->WgCheckTimer = 0;
+        this->WgWasWarTime = false;
         this->LfgCheckTimer = 0;
         this->PlayersCheckTimer = 0;
     }
@@ -228,6 +231,8 @@ private:
     void GetBots();
     std::vector<uint32> GetBgBots(uint32 bracket);
     time_t BgCheckTimer;
+    time_t WgCheckTimer;
+    bool   WgWasWarTime;
     time_t LfgCheckTimer;
     time_t PlayersCheckTimer;
     time_t RealPlayerLastTimeSeen = 0;

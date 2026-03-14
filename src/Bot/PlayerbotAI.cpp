@@ -56,6 +56,8 @@
 #include "Transport.h"
 #include "Unit.h"
 #include "UpdateTime.h"
+#include "Battlefield.h"
+#include "BattlefieldMgr.h"
 #include "Vehicle.h"
 
 constexpr uint32 SPELL_TITAN_GRIP = 49152;
@@ -196,6 +198,8 @@ PlayerbotAI::PlayerbotAI(Player* bot)
     botOutgoingPacketHandlers.AddHandler(SMSG_DUEL_REQUESTED, "duel requested");
     botOutgoingPacketHandlers.AddHandler(SMSG_INVENTORY_CHANGE_FAILURE, "inventory change failure");
     botOutgoingPacketHandlers.AddHandler(SMSG_BATTLEFIELD_STATUS, "bg status");
+    botOutgoingPacketHandlers.AddHandler(SMSG_BATTLEFIELD_MGR_QUEUE_INVITE, "wg queue invite");
+    botOutgoingPacketHandlers.AddHandler(SMSG_BATTLEFIELD_MGR_ENTRY_INVITE, "wg entry invite");
     botOutgoingPacketHandlers.AddHandler(SMSG_LFG_ROLE_CHECK_UPDATE, "lfg role check");
     botOutgoingPacketHandlers.AddHandler(SMSG_LFG_PROPOSAL_UPDATE, "lfg proposal");
     botOutgoingPacketHandlers.AddHandler(SMSG_TEXT_EMOTE, "receive text emote");
@@ -436,6 +440,11 @@ void PlayerbotAI::UpdateAIGroupMaster()
     if (master)
         masterBotAI = GET_PLAYERBOT_AI(master);
 
+    // Don't reassign master while the bot is in a WG raid group.
+    Battlefield* wg = sBattlefieldMgr->GetBattlefieldByBattleId(BATTLEFIELD_BATTLEID_WG);
+    if (IsRandomBot && wg && wg->GetGroupPlayer(bot->GetGUID(), bot->GetTeamId()))
+        return;
+
     if (!master || (masterBotAI && !masterBotAI->IsRealPlayer()))
     {
         Player* newMaster = FindNewMaster();
@@ -449,12 +458,16 @@ void PlayerbotAI::UpdateAIGroupMaster()
             {
                 botAI->ChangeStrategy("+follow", BOT_STATE_NON_COMBAT);
 
-                if (botAI->GetMaster() == botAI->GetGroupLeader())
-                    botAI->TellMaster(PlayerbotTextMgr::instance().GetBotTextOrDefault(
-                        "hello_follow", "Hello, I follow you!", {}));
-                else
-                    botAI->TellMaster(PlayerbotTextMgr::instance().GetBotTextOrDefault(
-                        "hello", "Hello!", {}));
+                Battlefield* bf = sBattlefieldMgr->GetBattlefieldToZoneId(bot->GetZoneId());
+                if (!bf || !bf->IsWarTime())
+                {
+                    if (botAI->GetMaster() == botAI->GetGroupLeader())
+                        botAI->TellMaster(PlayerbotTextMgr::instance().GetBotTextOrDefault(
+                            "hello_follow", "Hello, I follow you!", {}));
+                    else
+                        botAI->TellMaster(PlayerbotTextMgr::instance().GetBotTextOrDefault(
+                            "hello", "Hello!", {}));
+                }
             }
             else
             {
@@ -1378,6 +1391,24 @@ void PlayerbotAI::HandleBotOutgoingPacket(WorldPacket const& packet)
             if (guid != bot->GetGUID())
                 return;
             CheckMountStateAction::CompleteDismount(bot);
+            return;
+        }
+        case SMSG_BATTLEFIELD_MGR_QUEUE_INVITE:
+        {
+            // Store the pending queue invite. BfStrategyCheckAction will process it later,
+            // ensuring acceptance works in combat mode (packet triggers only fire in non-combat).
+            WorldPacket p(packet);
+            p.rpos(0);
+            p >> pendingWgQueueInviteBattleId;
+            return;
+        }
+        case SMSG_BATTLEFIELD_MGR_ENTRY_INVITE:
+        {
+            // Store the pending entry invite. BfStrategyCheckAction will process it later,
+            // ensuring acceptance works in combat mode.
+            WorldPacket p(packet);
+            p.rpos(0);
+            p >> pendingWgEntryInviteBattleId;
             return;
         }
         default:
@@ -4626,6 +4657,15 @@ bool PlayerbotAI::AllowActive(ActivityType activityType)
     // bot is waiting in a BG queue — stay active to speed up join
     if (bot->InBattlegroundQueue())
         return true;
+
+    // Wintergrasp is on the overworld map (571) so the check above doesn't exempt it.
+    // During active wartime treat it like a BG: always allow activity.
+    // Outside wartime (NoBattleTimer) smart scaling applies normally.
+    {
+        Battlefield* wg = sBattlefieldMgr->GetBattlefieldByBattleId(BATTLEFIELD_BATTLEID_WG);
+        if (wg && wg->IsWarTime() && bot->GetZoneId() == wg->GetZoneId())
+            return true;
+    }
 
     // bot is in a guild that contains a real player
     if (sPlayerbotAIConfig.BotActiveAloneForceWhenInGuild)

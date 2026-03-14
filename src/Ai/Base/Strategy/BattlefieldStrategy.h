@@ -1,0 +1,37 @@
+/*
+ * Copyright (C) 2016+ AzerothCore <www.azerothcore.org>, released under GNU AGPL v3 license, you may redistribute it
+ * and/or modify it under version 3 of the License, or (at your option), any later version.
+ */
+
+#ifndef _PLAYERBOT_BATTLEFIELDSTRATEGY_H
+#define _PLAYERBOT_BATTLEFIELDSTRATEGY_H
+
+#include "PassTroughStrategy.h"
+#include "Strategy.h"
+
+// Always active WG lifecycle strategy. Accepts queue/entry invites and periodically fires BfStrategyCheckAction
+// to toggle WintergraspStrategy based on war state.
+class BfStrategy : public PassTroughStrategy
+{
+public:
+    BfStrategy(PlayerbotAI* botAI);
+
+    uint32 GetType() const override { return STRATEGY_TYPE_NONCOMBAT; }
+    void InitTriggers(std::vector<TriggerNode*>& triggers) override;
+    std::string const getName() override { return "bf"; }
+};
+
+// Active during WG war for enrolled bots. Responsible for foot and vehicle navigation, acquiring and using
+// vehicles, and fires BfStrategyCheckAction on respawn after death.
+class WintergraspStrategy : public Strategy
+{
+public:
+    WintergraspStrategy(PlayerbotAI* botAI) : Strategy(botAI){};
+
+    uint32 GetType() const override { return STRATEGY_TYPE_GENERIC; }
+    std::vector<NextAction> getDefaultActions() override;
+    void InitTriggers(std::vector<TriggerNode*>& triggers) override;
+    std::string const getName() override { return "wintergrasp"; }
+};
+
+#endif

@@ -6,6 +6,8 @@
 
 #include "AiFactory.h"
 
+#include "Battlefield.h"
+#include "BattlefieldMgr.h"
 #include "BattlegroundMgr.h"
 #include "DKAiObjectContext.h"
 #include "DruidAiObjectContext.h"
@@ -493,6 +495,17 @@ void AiFactory::AddDefaultCombatStrategies(Player* player, PlayerbotAI* const fa
         engine->removeStrategy("threat", false);
         engine->addStrategy("boost", false);
     }
+
+
+    // Add BfStrategy to random bots on the combat engine so BfStrategyCheckAction fires during sustained
+    // combat, and restore WintergraspStrategy on rebuild if the bot is already in WG during wartime.
+    if (sRandomPlayerbotMgr.IsRandomBot(player) && sPlayerbotAIConfig.randomBotJoinBF && !player->InBattleground())
+    {
+        engine->addStrategy("bf", false);
+        Battlefield* wg = sBattlefieldMgr->GetBattlefieldByBattleId(BATTLEFIELD_BATTLEID_WG);
+        if (wg && wg->IsWarTime() && player->GetZoneId() == wg->GetZoneId())
+            engine->addStrategy("wintergrasp", false);
+    }
 }
 
 Engine* AiFactory::createCombatEngine(Player* player, PlayerbotAI* const facade, AiObjectContext* aiObjectContext)
@@ -599,6 +612,16 @@ void AiFactory::AddDefaultNonCombatStrategies(Player* player, PlayerbotAI* const
 
         if (sPlayerbotAIConfig.randomBotJoinLfg)
             nonCombatEngine->addStrategy("lfg", false);
+
+        // Add BfStrategy to all random bots on the non-combat engine so each manages its own WG lifecycle,
+        // and restore WintergraspStrategy on rebuild if the bot is already in WG during wartime.
+        if (sPlayerbotAIConfig.randomBotJoinBF)
+        {
+            nonCombatEngine->addStrategy("bf", false);
+            Battlefield* wg = sBattlefieldMgr->GetBattlefieldByBattleId(BATTLEFIELD_BATTLEID_WG);
+            if (wg && wg->IsWarTime() && player->GetZoneId() == wg->GetZoneId())
+                nonCombatEngine->addStrategy("wintergrasp", false);
+        }
 
         if (!player->GetGroup() || player->GetGroup()->GetLeaderGUID() == player->GetGUID())
         {

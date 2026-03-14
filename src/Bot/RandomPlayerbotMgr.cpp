@@ -16,6 +16,9 @@
 #include <random>
 
 #include "AiFactory.h"
+#include "Battlefield.h"
+#include "BattlefieldMgr.h"
+#include "BattlefieldWG.h"
 #include "Battleground.h"
 #include "BattlegroundMgr.h"
 #include "ChannelMgr.h"
@@ -382,6 +385,12 @@ void RandomPlayerbotMgr::UpdateAIInternal(uint32 /*elapsed*/, bool /*minimal*/)
     {
         if (time(nullptr) > (BgCheckTimer + 35))
             sRandomPlayerbotMgr.CheckBgQueue();
+    }
+
+    if (sPlayerbotAIConfig.randomBotJoinBF)
+    {
+        if (time(nullptr) > (WgCheckTimer + 30))
+            sRandomPlayerbotMgr.CheckWgQueue();
     }
 
     if (sPlayerbotAIConfig.randomBotJoinLfg /* && !players.empty()*/)
@@ -1247,6 +1256,146 @@ void RandomPlayerbotMgr::LogBattlegroundInfo()
         }
     }
     LOG_DEBUG("playerbots", "BG Queue check finished");
+}
+
+void RandomPlayerbotMgr::CheckWgQueue()
+{
+    if (!WgCheckTimer)
+    {
+        WgCheckTimer = time(nullptr);
+        return;
+    }
+
+    WgCheckTimer = time(nullptr);
+
+    Battlefield* bf = sBattlefieldMgr->GetBattlefieldByBattleId(BATTLEFIELD_BATTLEID_WG);
+    BattlefieldWG* wg = dynamic_cast<BattlefieldWG*>(bf);
+    if (!wg)
+        return;
+
+    bool wartime = wg->IsWarTime();
+
+    // A: Wintergrasp battle has begun!
+    if (wartime)
+    {
+        // Only invite bots when at least one real player is in the WG zone.
+        bool hasRealPlayer = false;
+        for (Player* p : players)
+        {
+            if (p && p->IsInWorld() && p->GetZoneId() == wg->GetZoneId())
+            {
+                hasRealPlayer = true;
+                break;
+            }
+        }
+        if (hasRealPlayer)
+        {
+            uint32 minLevel = sConfigMgr->GetOption<uint32>("Wintergrasp.PlayerMinLvl", 75);
+
+            // Collect eligible random bots for Wintergrasp.
+            std::vector<Player*> eligible;
+            for (auto& [guid, bot] : playerBots)
+            {
+                if (!bot || !bot->IsInWorld() || !IsRandomBot(bot))
+                    continue;
+                if (bot->GetLevel() < minLevel)
+                    continue;
+                eligible.push_back(bot);
+            }
+
+            // Invite bots bots at the highest level first, then descending.
+            std::sort(eligible.begin(), eligible.end(),
+                      [](Player* a, Player* b) { return a->GetLevel() > b->GetLevel(); });
+
+            for (Player* bot : eligible)
+            {
+                TeamId team = bot->GetTeamId();
+                if (wg->GetPlayersInWarCount(team) >= wg->GetMaxPlayersPerTeam())
+                    continue;
+
+                wg->InvitePlayerToWar(bot);
+            }
+        }
+
+        // B: Prioritize real players: Eject one bot per real player waiting in m_PlayersWillBeKick (Players in
+        // WG, but couldn't get a slot). InvitePlayersInZoneToWar() (runs every 5 seconds in Battlefield::Update)
+        // will automatically invite the freed slot to the waiting real player.
+        for (uint8 team = 0; team < PVP_TEAMS_COUNT; ++team)
+        {
+            PlayerTimerMap const& willBeKick = wg->GetPlayersWillBeKick(static_cast<TeamId>(team));
+            if (willBeKick.empty())
+                continue;
+
+            // Count real players waiting for a slot on this team.
+            uint32 realWaiting = 0;
+            for (auto const& [guid, deadline] : willBeKick)
+            {
+                if (Player* waiter = ObjectAccessor::FindPlayer(guid))
+                    if (playerBots.count(guid) == 0)
+                        ++realWaiting;
+            }
+
+            if (realWaiting == 0)
+                continue;
+
+            // Eject one random bot per waiting real player from this team.
+            uint32 ejected = 0;
+            for (auto& [guid, bot] : playerBots)
+            {
+                if (ejected >= realWaiting)
+                    break;
+
+                if (!bot || !bot->IsInWorld() || !IsRandomBot(bot))
+                    continue;
+
+                if (static_cast<uint8>(bot->GetTeamId()) != team)
+                    continue;
+
+                if (!wg->IsPlayerInWar(bot))
+                    continue;
+
+                LOG_DEBUG("playerbots", "WG slot priority: ejecting bot {} to free slot for real player",
+                    bot->GetName());
+
+                wg->PlayerAskToLeave(bot);
+                ++ejected;
+            }
+        }
+    }
+
+    // C: On war end, teleport random bots in WG to Dalaran
+    if (WgWasWarTime && !wartime)
+    {
+        for (auto& [guid, bot] : playerBots)
+        {
+            if (!bot || !bot->IsInWorld() || !IsRandomBot(bot))
+                continue;
+
+            if (bot->GetZoneId() != wg->GetZoneId())
+                continue;
+
+            // Remove from the WG queue so the stale queue entry can't earn a war entry
+            // invite at the next battle start (HandlePlayerLeaveZone does NOT do this).
+            bf->AskToLeaveQueue(bot);
+
+            // Teleport: Dalaran (ID 53140)
+            if (!bot->IsBeingTeleported())
+                bot->TeleportTo(571, 5807.750f, 588.347f, 660.939f, 1.663f);
+
+            //TODO: If later decided to teleport bots to their capital cities instead, these are their coordinates:
+            // (0, -9003.460f, 870.031f, 29.621f, 5.280f)           // Stormwind
+            // (1, 9660.810f, 2513.640f, 1331.657f, 3.060f)         // Darnassus
+            // (0, -4613.620f, -915.380f, 501.062f, 3.880f)         // Ironforge
+            // (530, -4029.930f, -11572.200f, -138.296f, 2.430f)    // Exodar
+            // (1, 1469.850f, -4221.520f, 58.994f, 5.980f)          // Orgrimmar
+            // (0, 1773.470f, 61.121f, -46.321f, 0.540f)            // Undercity
+            // (1, -964.980f, 283.433f, 111.187f, 3.020f)           // Thunder Bluff
+            // (530, 9998.490f, -7106.780f, 47.706f, 2.440f)        // Silvermoon City
+        }
+    }
+
+    // Stores if Wintergrasp was on war time in the previous tick.
+    WgWasWarTime = wartime;
 }
 
 void RandomPlayerbotMgr::CheckLfgQueue()
@@ -2519,10 +2668,10 @@ void RandomPlayerbotMgr::OnPlayerLogout(Player* player)
         if (botAI && player == botAI->GetMaster())
         {
             botAI->SetMaster(nullptr);
-            if (!bot->InBattleground())
-            {
+            Battlefield* wgBf = sBattlefieldMgr->GetBattlefieldByBattleId(BATTLEFIELD_BATTLEID_WG);
+            bool inActiveWG = wgBf && wgBf->IsWarTime() && bot->GetZoneId() == wgBf->GetZoneId();
+            if (!bot->InBattleground() && !inActiveWG)
                 botAI->ResetStrategies();
-            }
         }
     }
 
@@ -2587,7 +2736,9 @@ void RandomPlayerbotMgr::OnPlayerLogin(Player* player)
             PlayerbotAI* botAI = GET_PLAYERBOT_AI(bot);
             if (botAI && member == player && (!botAI->GetMaster() || GET_PLAYERBOT_AI(botAI->GetMaster())))
             {
-                if (!bot->InBattleground())
+                Battlefield* wgBf = sBattlefieldMgr->GetBattlefieldByBattleId(BATTLEFIELD_BATTLEID_WG);
+                bool inActiveWG = wgBf && wgBf->IsWarTime() && bot->GetZoneId() == wgBf->GetZoneId();
+                if (!bot->InBattleground() && !inActiveWG)
                 {
                     botAI->SetMaster(player);
                     botAI->ResetStrategies();

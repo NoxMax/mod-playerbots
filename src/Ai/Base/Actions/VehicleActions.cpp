@@ -7,6 +7,9 @@
 #include "VehicleActions.h"
 
 #include "BattlegroundIC.h"
+#include "Battlefield.h"
+#include "BattlefieldMgr.h"
+#include "BattlefieldWG.h"
 #include "ItemVisitors.h"
 #include "ObjectDefines.h"
 #include "Playerbots.h"
@@ -50,20 +53,35 @@ bool EnterVehicleAction::Execute(Event event)
         if (vehicleBase->HasUnitFlag(UNIT_FLAG_NOT_SELECTABLE))
             continue;
 
-        // dont let them get in the cannons as they'll stay forever and do nothing useful
-        // dont let them in catapult they cant use them at all
-        if (NPC_KEEP_CANNON == vehicleBase->GetEntry() || NPC_CATAPULT == vehicleBase->GetEntry())
+        // IoC-specific: dont let bots get in the cannons as they'll stay forever and do nothing useful,
+        // and the catapult can't be driven by bots
+        if (vehicleBase->GetEntry() == NPC_KEEP_CANNON || vehicleBase->GetEntry() == NPC_CATAPULT)
             continue;
 
+        // Faction check before the more expensive battlefield lookup
         if (!vehicleBase->IsFriendlyTo(bot))
             continue;
 
-        if (!vehicleBase->GetVehicleKit()->GetAvailableSeatCount())
+        // WG defenders fight on foot at the fortress interior; only attackers use field vehicles (for now).
+        // Tower cannons are mounted via WgMountTowerCannonAction which calls HandleSpellClick directly.
+        uint32 entry = vehicleBase->GetEntry();
+        if (entry == NPC_WINTERGRASP_CATAPULT            ||
+            entry == NPC_WINTERGRASP_DEMOLISHER          ||
+            entry == NPC_WINTERGRASP_SIEGE_ENGINE_ALLIANCE ||
+            entry == NPC_WINTERGRASP_SIEGE_ENGINE_HORDE  ||
+            entry == NPC_WINTERGRASP_TOWER_CANNON)
+        {
+            Battlefield* bf = sBattlefieldMgr->GetBattlefieldByBattleId(BATTLEFIELD_BATTLEID_WG);
+            if (bf && bf->IsWarTime() && bot->GetTeamId() == bf->GetDefenderTeam())
+                continue;
+        }
+
+        Vehicle* vehKit = vehicleBase->GetVehicleKit();
+        if (!vehKit || !vehKit->GetAvailableSeatCount())
             continue;
 
-        // this will avoid adding passengers (which dont really do much for the IOC vehicles which is the only place
-        // this code is used)
-        if (vehicleBase->GetVehicleKit()->IsVehicleInUse())
+        // Avoid adding passengers; they do little for IoC or WG vehicles.
+        if (vehKit->IsVehicleInUse())
             continue;
 
         if (EnterVehicle(vehicleBase, true))

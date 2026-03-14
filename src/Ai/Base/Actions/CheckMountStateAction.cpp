@@ -6,6 +6,9 @@
 
 #include "CheckMountStateAction.h"
 #include "AreaDefines.h"
+#include "Battlefield.h"
+#include "BattlefieldMgr.h"
+#include "BattlefieldWG.h"
 #include "BattleGroundTactics.h"
 #include "BattlegroundEY.h"
 #include "BattlegroundWS.h"
@@ -97,9 +100,7 @@ bool CheckMountStateAction::Execute(Event /*event*/)
         shouldMount = (distanceToTarget > mountDistance + combatReach);
     }
     else
-    {
         shouldMount = true;
-    }
 
     // If should dismount, or master (if any) is no longer in travel form, yet bot still is, remove the shapeshifts
     if (shouldDismount ||
@@ -116,6 +117,14 @@ bool CheckMountStateAction::Execute(Event /*event*/)
 
     bool inBattleground = bot->InBattleground();
     bool const noRealMaster = (!master || master == bot);
+
+    // Treat WG wartime like a BG: bots should mount independently of any master.
+    if (!inBattleground)
+    {
+        Battlefield* wgBf = sBattlefieldMgr->GetBattlefieldByBattleId(BATTLEFIELD_BATTLEID_WG);
+        if (wgBf && wgBf->IsWarTime() && bot->GetZoneId() == wgBf->GetZoneId())
+            inBattleground = true;
+    }
 
     // If there is a master and bot not in BG, follow master's mount state regardless of group leader
     if (!noRealMaster && !inBattleground)
@@ -539,6 +548,17 @@ int32 CheckMountStateAction::CalculateMasterMountSpeed(Player* master) const
         else if (masterInShapeshiftForm == FORM_FLIGHT)
             return 149;
         return 59;  // walk pace
+    }
+    else
+    {
+        // Bots on their own.
+        int32 speed = mountData.maxSpeed;
+        // In BG or WG (no-fly zones), cap at ground-mount speed so the mount filter
+        // doesn't skip all ground mounts in favour of inaccessible flying mounts.
+        if ((bot->InBattleground() || bot->GetZoneId() == AREA_WINTERGRASP) && speed > 99)
+            return 99;
+
+        return speed;
     }
 
     // No real master OR battleground: pick speed by skill tier.

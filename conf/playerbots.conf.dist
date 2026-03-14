@@ -36,7 +36,7 @@
 #        STRATEGIES
 #        RPG STRATEGY
 #        TELEPORTS
-#        BATTLEGROUND & ARENA & PVP
+#        BATTLEGROUNDS, ARENA, WINTERGRASP, & PVP
 #        RANDOMBOT TIMING AND BEHAVIOR
 #    PREMADE SPECS
 #        INFORMATION
@@ -1260,14 +1260,20 @@ AiPlayerbot.AutoTeleportForLevel = 1
 ####################################################################################################
 
 ####################################################################################################
-# BATTLEGROUNDS & ARENAS & PVP
+# BATTLEGROUNDS, ARENA, WINTERGRASP, & PVP
 #
 
-# Enable battlegrounds/arenas for randombots
+# Enable battlegrounds and arenas for randombots
 AiPlayerbot.RandomBotJoinBG = 1
 
-# Enable auto-joining of battlegrounds - have bots start battlegrounds and arenas on their own
+# Enable bots auto-joining battlegrounds and arenas on their own, even without real players
 AiPlayerbot.RandomBotAutoJoinBG = 0
+
+# Enable Wintergrasp battle for randombots
+# The default values in worldserver.conf is up to 120 vs. 120 players. If your server cannot
+# handle up to 239 bots + you fighting in one place, consider lowering that value. Or embrace
+# the chaos. Regardless, the server will not invite bots to the battle without a real player.
+AiPlayerbot.RandomBotJoinBF = 1
 
 # Required Configuration for RandomBotAutoJoinBG
 #

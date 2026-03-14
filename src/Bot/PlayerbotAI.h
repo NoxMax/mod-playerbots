@@ -611,6 +611,9 @@ public:
     // Schedules a callback to run once after <delayMs> milliseconds.
     void AddTimedEvent(std::function<void()> callback, uint32 delayMs);
 
+    // Set by incoming WG enrollment packets, then consumed by BattlefieldJoinAction to accept queue/entry invites.
+    uint32 pendingWgQueueInviteBattleId = 0;
+    uint32 pendingWgEntryInviteBattleId = 0;
 private:
     static void _fillGearScoreData(Player* player, Item* item, std::vector<uint32>* gearScore, uint32& twoHandScore,
                                    bool mixed = false);
