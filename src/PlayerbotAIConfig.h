@@ -253,6 +253,7 @@ public:
 
     bool RandomBotJoinBG;
     bool RandomBotAutoJoinBG;
+    bool RandomBotJoinBF;
 
     std::string RandomBotAutoJoinICBrackets;
     std::string RandomBotAutoJoinEYBrackets;
