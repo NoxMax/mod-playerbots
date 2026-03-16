@@ -7,11 +7,14 @@
 #ifndef PLAYERBOTS_RANDOMPLAYERBOTMGR_H
 #define PLAYERBOTS_RANDOMPLAYERBOTMGR_H
 
+#include "Battlefield.h"
+#include "BattlefieldMgr.h"
 #include "NewRpgInfo.h"
 #include "ObjectGuid.h"
 #include "PlayerbotMgr.h"
 #include "GameTime.h"
 #include "PlayerbotCommandServer.h"
+#include "Player.h"
 
 struct BattlegroundInfo
 {
@@ -43,6 +46,14 @@ struct BattlegroundInfo
     uint32 bgHordePlayerCount = 0;
     uint32 bgAlliancePlayerCount = 0;
 };
+
+// Player class in core has InBattleground() but no InBattlefield() equivalent.
+// Until that's added, BotInBattlefield is created to handle such function for bots.
+inline bool BotInBattlefield(Player* bot)
+{
+    Battlefield* bf = sBattlefieldMgr->GetBattlefieldToZoneId(bot->GetZoneId());
+    return bf && bf->IsWarTime();
+}
 
 class ChatHandler;
 class PerfMonitorOperation;

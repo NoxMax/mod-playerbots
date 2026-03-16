@@ -41,9 +41,7 @@ static bool AcceptEntryInvite(Player* bot, PlayerbotAI* botAI, uint32 battleId)
 
 bool BfStrategyCheckAction::Execute(Event event)
 {
-    bool inWG = bot->GetZoneId() == AREA_WINTERGRASP;
-    Battlefield* wg = sBattlefieldMgr->GetBattlefieldByBattleId(BATTLEFIELD_BATTLEID_WG);
-    bool wartime = wg && wg->IsWarTime();
+    bool inActiveWG = BotInBattlefield(bot);
 
     // Process pending WG invites (stored when packets arrived, processed here to work in combat mode)
     if (botAI->pendingWgQueueInviteBattleId)
@@ -65,14 +63,14 @@ bool BfStrategyCheckAction::Execute(Event event)
     bool hasWGStratCombat = botAI->HasStrategy("wintergrasp", BOT_STATE_COMBAT);
     bool hasWGStrat = hasWGStratNonCombat || hasWGStratCombat;
 
-    if (inWG && wartime && !hasWGStrat)
+    if (inActiveWG && !hasWGStrat)
     {
         botAI->ChangeStrategy("+wintergrasp", BOT_STATE_NON_COMBAT);
         botAI->ChangeStrategy("+wintergrasp", BOT_STATE_COMBAT);
         LOG_INFO("playerbots", "Bot {} <{}> activates Wintergrasp strategy", bot->GetGUID().ToString(), bot->GetName());
         return true;
     }
-    if ((!inWG || !wartime) && hasWGStrat)
+    if (!inActiveWG && hasWGStrat)
     {
         botAI->ChangeStrategy("-wintergrasp", BOT_STATE_NON_COMBAT);
         botAI->ChangeStrategy("-wintergrasp", BOT_STATE_COMBAT);

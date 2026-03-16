@@ -118,13 +118,9 @@ bool CheckMountStateAction::Execute(Event /*event*/)
     bool inBattleground = bot->InBattleground();
     bool const noRealMaster = (!master || master == bot);
 
-    // Treat WG wartime like a BG: bots should mount independently of any master.
-    if (!inBattleground)
-    {
-        Battlefield* wgBf = sBattlefieldMgr->GetBattlefieldByBattleId(BATTLEFIELD_BATTLEID_WG);
-        if (wgBf && wgBf->IsWarTime() && bot->GetZoneId() == wgBf->GetZoneId())
-            inBattleground = true;
-    }
+    // Treat bots in WG battles like a BG: they should mount independently of any master.
+    if (!inBattleground && BotInBattlefield(bot))
+        inBattleground = true;
 
     // If there is a master and bot not in BG, follow master's mount state regardless of group leader
     if (!noRealMaster && !inBattleground)

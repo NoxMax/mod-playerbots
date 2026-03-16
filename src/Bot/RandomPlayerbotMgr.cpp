@@ -2668,9 +2668,7 @@ void RandomPlayerbotMgr::OnPlayerLogout(Player* player)
         if (botAI && player == botAI->GetMaster())
         {
             botAI->SetMaster(nullptr);
-            Battlefield* wgBf = sBattlefieldMgr->GetBattlefieldByBattleId(BATTLEFIELD_BATTLEID_WG);
-            bool inActiveWG = wgBf && wgBf->IsWarTime() && bot->GetZoneId() == wgBf->GetZoneId();
-            if (!bot->InBattleground() && !inActiveWG)
+            if (!bot->InBattleground() && !BotInBattlefield(bot))
                 botAI->ResetStrategies();
         }
     }
@@ -2736,9 +2734,7 @@ void RandomPlayerbotMgr::OnPlayerLogin(Player* player)
             PlayerbotAI* botAI = GET_PLAYERBOT_AI(bot);
             if (botAI && member == player && (!botAI->GetMaster() || GET_PLAYERBOT_AI(botAI->GetMaster())))
             {
-                Battlefield* wgBf = sBattlefieldMgr->GetBattlefieldByBattleId(BATTLEFIELD_BATTLEID_WG);
-                bool inActiveWG = wgBf && wgBf->IsWarTime() && bot->GetZoneId() == wgBf->GetZoneId();
-                if (!bot->InBattleground() && !inActiveWG)
+                if (!bot->InBattleground() && !BotInBattlefield(bot))
                 {
                     botAI->SetMaster(player);
                     botAI->ResetStrategies();

@@ -502,8 +502,7 @@ void AiFactory::AddDefaultCombatStrategies(Player* player, PlayerbotAI* const fa
     if (sRandomPlayerbotMgr.IsRandomBot(player) && sPlayerbotAIConfig.randomBotJoinBF && !player->InBattleground())
     {
         engine->addStrategy("bf", false);
-        Battlefield* wg = sBattlefieldMgr->GetBattlefieldByBattleId(BATTLEFIELD_BATTLEID_WG);
-        if (wg && wg->IsWarTime() && player->GetZoneId() == wg->GetZoneId())
+        if (BotInBattlefield(player))
             engine->addStrategy("wintergrasp", false);
     }
 }
@@ -618,8 +617,7 @@ void AiFactory::AddDefaultNonCombatStrategies(Player* player, PlayerbotAI* const
         if (sPlayerbotAIConfig.randomBotJoinBF)
         {
             nonCombatEngine->addStrategy("bf", false);
-            Battlefield* wg = sBattlefieldMgr->GetBattlefieldByBattleId(BATTLEFIELD_BATTLEID_WG);
-            if (wg && wg->IsWarTime() && player->GetZoneId() == wg->GetZoneId())
+            if (BotInBattlefield(player))
                 nonCombatEngine->addStrategy("wintergrasp", false);
         }
 
