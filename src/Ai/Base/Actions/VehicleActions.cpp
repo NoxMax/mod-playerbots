@@ -62,14 +62,18 @@ bool EnterVehicleAction::Execute(Event event)
         if (!vehicleBase->IsFriendlyTo(bot))
             continue;
 
-        // WG defenders fight on foot at the fortress interior; only attackers use field vehicles (for now).
-        // Tower cannons are mounted via WgMountTowerCannonAction which calls HandleSpellClick directly.
         uint32 entry = vehicleBase->GetEntry();
-        if (entry == NPC_WINTERGRASP_CATAPULT            ||
-            entry == NPC_WINTERGRASP_DEMOLISHER          ||
-            entry == NPC_WINTERGRASP_SIEGE_ENGINE_ALLIANCE ||
-            entry == NPC_WINTERGRASP_SIEGE_ENGINE_HORDE  ||
-            entry == NPC_WINTERGRASP_TOWER_CANNON)
+
+        // Tower cannons are custom handled only by WgMountTowerCannonAction in BattlefieldTactics.
+        // This check ensures a future extension for attacker cannons also routes through that action.
+        if (entry == NPC_WINTERGRASP_TOWER_CANNON)
+            continue;
+
+        // WG defenders fight on foot at the fortress; only attackers use field vehicles (for now).
+        if (entry == NPC_WINTERGRASP_CATAPULT               ||
+            entry == NPC_WINTERGRASP_DEMOLISHER             ||
+            entry == NPC_WINTERGRASP_SIEGE_ENGINE_ALLIANCE  ||
+            entry == NPC_WINTERGRASP_SIEGE_ENGINE_HORDE)
         {
             Battlefield* bf = sBattlefieldMgr->GetBattlefieldByBattleId(BATTLEFIELD_BATTLEID_WG);
             if (bf && bf->IsWarTime() && bot->GetTeamId() == bf->GetDefenderTeam())
