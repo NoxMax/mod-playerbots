@@ -1605,6 +1605,9 @@ bool RandomPlayerbotMgr::ProcessBot(Player* bot)
     if (bot->InBattlegroundQueue())
         return false;
 
+    if (BotInBattlefield(bot))
+        return false;
+
      uint32 botId = bot->GetGUID().GetCounter();
 
     // if death revive
@@ -1740,6 +1743,10 @@ void RandomPlayerbotMgr::RandomTeleport(Player* bot, std::vector<WorldLocation>&
 
     // ignore when in battle grounds or arena.
     if (bot->InBattleground() || bot->InArena())
+        return;
+
+    // ignore when in an active battlefield (Wintergrasp).
+    if (BotInBattlefield(bot))
         return;
 
     // ignore when in group (e.g. world, dungeons, raids) and leader is not a player.
@@ -1919,6 +1926,9 @@ void RandomPlayerbotMgr::RandomTeleportForLevel(Player* bot)
     if (bot->InBattleground())
         return;
 
+    if (BotInBattlefield(bot))
+        return;
+
     if (bot->GetLevel() >= 10 && urand(0, 100) < sPlayerbotAIConfig.probTeleToBankers * 100)
     {
         std::vector<WorldLocation> locs = sTravelMgr.GetCityLocations(bot);
@@ -1941,6 +1951,9 @@ void RandomPlayerbotMgr::RandomTeleportGrindForLevel(Player* bot)
     if (bot->InBattleground())
         return;
 
+    if (BotInBattlefield(bot))
+        return;
+
     std::vector<WorldLocation> locs = sTravelMgr.GetTeleportLocations(bot);
     LOG_DEBUG("playerbots", "Random teleporting bot {} for level {} ({} locations available)", bot->GetName().c_str(),
               bot->GetLevel(), locs.size());
@@ -1951,6 +1964,9 @@ void RandomPlayerbotMgr::RandomTeleportGrindForLevel(Player* bot)
 void RandomPlayerbotMgr::RandomTeleport(Player* bot)
 {
     if (bot->InBattleground())
+        return;
+
+    if (BotInBattlefield(bot))
         return;
 
     PerfMonitorOperation* pmo = sPerfMonitor.start(PERF_MON_RNDBOT, "RandomTeleport");
@@ -1990,6 +2006,9 @@ void RandomPlayerbotMgr::RandomTeleport(Player* bot)
 void RandomPlayerbotMgr::Randomize(Player* bot)
 {
     if (bot->InBattleground())
+        return;
+
+    if (BotInBattlefield(bot))
         return;
 
     if (bot->GetLevel() < 3 || (bot->GetLevel() < 56 && bot->getClass() == CLASS_DEATH_KNIGHT))
@@ -2218,6 +2237,9 @@ void RandomPlayerbotMgr::Refresh(Player* bot)
     //     return;
 
     if (bot->InBattleground())
+        return;
+
+    if (BotInBattlefield(bot))
         return;
 
     LOG_DEBUG("playerbots", "Refreshing bot {} <{}>", bot->GetGUID().ToString().c_str(), bot->GetName().c_str());
