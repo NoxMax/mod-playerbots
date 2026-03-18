@@ -1278,7 +1278,8 @@ void RandomPlayerbotMgr::CheckWgQueue()
     // A: Wintergrasp battle has begun!
     if (wartime)
     {
-        // Only invite bots when at least one real player is in the WG zone.
+        // Only invite bots when at least one real player is in the WG zone. Bots that are already in WG will
+        // be invited by the core logic however, and will join the battle if AiPlayerbot.RandomBotJoinBF = 1
         bool hasRealPlayer = false;
         for (Player* p : players)
         {
@@ -1303,7 +1304,7 @@ void RandomPlayerbotMgr::CheckWgQueue()
                 eligible.push_back(bot);
             }
 
-            // Invite bots bots at the highest level first, then descending.
+            // Invite bots at the highest level first, then descending.
             std::sort(eligible.begin(), eligible.end(),
                       [](Player* a, Player* b) { return a->GetLevel() > b->GetLevel(); });
 

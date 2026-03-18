@@ -1270,9 +1270,9 @@ AiPlayerbot.RandomBotJoinBG = 1
 AiPlayerbot.RandomBotAutoJoinBG = 0
 
 # Enable Wintergrasp battle for randombots
-# The default values in worldserver.conf is up to 120 vs. 120 players. If your server cannot
-# handle up to 239 bots + you fighting in one place, consider lowering that value. Or embrace
-# the chaos. Regardless, the server will not invite bots to the battle without a real player.
+# The default value in worldserver.conf is up to 120 vs. 120 players. If your server can't handle
+# up to 239 bots + you fighting in one place, consider lowering that value. Or embrace the chaos.
+# Regardless, bots from outside Wintergrasp will not be invited without a real player there.
 AiPlayerbot.RandomBotJoinBF = 1
 
 # Required Configuration for RandomBotAutoJoinBG
