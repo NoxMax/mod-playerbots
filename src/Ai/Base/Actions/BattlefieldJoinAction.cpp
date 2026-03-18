@@ -89,7 +89,7 @@ bool BfStrategyCheckAction::Execute(Event event)
 
 // SMSG_BATTLEFIELD_MGR_QUEUE_INVITE packet layout:
 //   uint32 BattleId
-//   uint8  warmup (unused by us)
+//   uint8  queuing (1 = queuing for upcoming battle. Hardcoded as 1)
 bool AcceptBfQueueInviteAction::Execute(Event event)
 {
     WorldPacket p(event.getPacket());
