@@ -1816,6 +1816,12 @@ void RandomPlayerbotMgr::RandomTeleport(Player* bot, std::vector<WorldLocation>&
         if (!area)
             continue;
 
+        // Do not teleport to Wintergrasp during an active battle. This does not affect bots teleporting in via
+        // battle invite.
+        Battlefield* bf = sBattlefieldMgr->GetBattlefieldToZoneId(zone->ID);
+        if (bf && bf->IsWarTime())
+            continue;
+
         // Do not teleport to enemy zones if level is low
         if (zone->team == 4 && bot->GetTeamId() == TEAM_ALLIANCE)
             continue;
