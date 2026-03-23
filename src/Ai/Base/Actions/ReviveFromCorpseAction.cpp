@@ -82,6 +82,11 @@ bool FindCorpseAction::Execute(Event /*event*/)
     if (bot->InBattleground())
         return false;
 
+    // Wintergrasp: Resurrect at the graveyard via spirit guide or healer.
+    // Due to the nature of Wintergrasp being part of the open world, it cannot simply return false like BGs.
+    if (BotInBattlefield(bot))
+        return botAI->DoSpecificAction("spirit healer");
+
     Player* groupLeader = botAI->GetGroupLeader();
     Corpse* corpse = bot->GetCorpse();
     if (!corpse)
@@ -204,6 +209,9 @@ bool FindCorpseAction::isUseful()
 {
     if (bot->InBattleground())
         return false;
+
+    // No battlefield (Wintergrasp) exception here. Bots in WG need isUseful () to return true, so Execute()
+    // can fire and redirect them to SpiritHealerAction. WG is open world, not a managed BG instance.
 
     return bot->GetCorpse();
 }
