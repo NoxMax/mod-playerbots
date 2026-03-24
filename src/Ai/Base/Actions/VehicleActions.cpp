@@ -69,8 +69,11 @@ bool EnterVehicleAction::Execute(Event event)
         if (entry == NPC_WINTERGRASP_TOWER_CANNON)
             continue;
 
-        // WG defenders fight on foot at the fortress; only attackers use field vehicles (for now).
-        if (entry == NPC_WINTERGRASP_CATAPULT               ||
+        // Wintergrasp vehicles are custom handled in BattlefieldTactics.
+        // Do not add an exception to the siege engine turret though, so that a secondary driver can simply
+        // hitch a ride with the main driver and use the cannon.
+        if (entry == NPC_WINTERGRASP_TOWER_CANNON           ||
+            entry == NPC_WINTERGRASP_CATAPULT               ||
             entry == NPC_WINTERGRASP_DEMOLISHER             ||
             entry == NPC_WINTERGRASP_SIEGE_ENGINE_ALLIANCE  ||
             entry == NPC_WINTERGRASP_SIEGE_ENGINE_HORDE)
