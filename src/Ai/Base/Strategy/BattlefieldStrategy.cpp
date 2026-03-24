@@ -33,7 +33,7 @@ void WintergraspStrategy::InitTriggers(std::vector<TriggerNode*>& triggers)
     triggers.push_back(new TriggerNode("dead", {NextAction("bf strategy check", ACTION_EMERGENCY)}));
 
     // This is an active injection of the default navigation strategy. There may be an issue with getDefaultActions failing
-    // to trigger as the fallback sometimes (~3% of bots). This injection seems to help. TODO: Investigate the necessity of this.
+    // to trigger as the fallback sometimes. This injection seems to help. TODO: Investigate the necessity of this.
     triggers.push_back(new TriggerNode("timer", {NextAction("wg check flag", ACTION_MOVE + 1.0f)}));
 
     // Mount/dismount for travel; re-registered above NonCombatStrategy's priority so WG timer triggers don't starve it.
@@ -49,7 +49,8 @@ void WintergraspStrategy::InitTriggers(std::vector<TriggerNode*>& triggers)
     triggers.push_back(new TriggerNode("timer", {NextAction("enter vehicle", ACTION_MOVE + 8.0f)}));
 
     // Vehicle combat abilities; isPossible() limits each to applicable vehicle types.
-    triggers.push_back(new TriggerNode("in vehicle", {NextAction("hurl boulder", ACTION_MOVE + 9.0f)}));
-    triggers.push_back(new TriggerNode("in vehicle", {NextAction("ram", ACTION_MOVE + 9.0f)}));
+    // Low priority here for moving vehicles against creatures. Attacks on buildings and vehicles are handled in BattlefieldTactics.
+    triggers.push_back(new TriggerNode("in vehicle", {NextAction("hurl boulder", ACTION_MOVE + 1.0f)}));
+    triggers.push_back(new TriggerNode("in vehicle", {NextAction("ram", ACTION_MOVE + 1.0f)}));
     triggers.push_back(new TriggerNode("in vehicle", {NextAction("wg fire cannon", ACTION_MOVE + 9.0f)}));
 }

@@ -6,7 +6,9 @@
 
 #include "AttackersValue.h"
 
+#include "BattlefieldWG.h"
 #include "CellImpl.h"
+#include "Vehicle.h"
 #include "GridNotifiers.h"
 #include "GridNotifiersImpl.h"
 #include "Playerbots.h"
@@ -171,6 +173,15 @@ bool AttackersValue::IsPossibleTarget(Unit* attacker, Player* bot, float /*range
     // Visibility check
     if (!bot->CanSeeOrDetect(attacker))
         return false;
+
+    // Wintergrasp: Keep siege engine drivers focused on destroying walls
+    if (Vehicle* veh = bot->GetVehicle())
+    {
+        uint32 entry = veh->GetBase()->GetEntry();
+        if (entry == NPC_WINTERGRASP_SIEGE_ENGINE_ALLIANCE ||
+            entry == NPC_WINTERGRASP_SIEGE_ENGINE_HORDE)
+            return false;
+    }
 
     // PvP prohibition checks (skip for duels)
     if ((attacker->GetGUID().IsPlayer() || attacker->GetGUID().IsPet()) &&
