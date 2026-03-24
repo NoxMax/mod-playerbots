@@ -1279,7 +1279,7 @@ void RandomPlayerbotMgr::CheckWgQueue()
     if (wartime)
     {
         // Only invite bots when at least one real player is in the WG zone. Bots that are already in WG will
-        // be invited by the core logic however, and will join the battle if AiPlayerbot.RandomBotJoinBF = 1
+        // be invited by the core logic however, and will join the battle if AiPlayerbot.RandomBotJoinBF > 0
         bool hasRealPlayer = false;
         for (Player* p : players)
         {
@@ -1311,7 +1311,8 @@ void RandomPlayerbotMgr::CheckWgQueue()
             for (Player* bot : eligible)
             {
                 TeamId team = bot->GetTeamId();
-                if (wg->GetPlayersInWarCount(team) >= wg->GetMaxPlayersPerTeam())
+                uint32 botCap = (sPlayerbotAIConfig.randomBotJoinBF * wg->GetMaxPlayersPerTeam() + 99) / 100;
+                if (wg->GetPlayersInWarCount(team) >= botCap)
                     continue;
 
                 wg->InvitePlayerToWar(bot);
