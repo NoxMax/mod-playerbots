@@ -234,6 +234,7 @@ public:
         creators["wg summon vehicle"] = &ActionContext::wg_summon_vehicle;
         creators["wg mount tower cannon"] = &ActionContext::wg_mount_tower_cannon;
         creators["wg fire cannon"] = &ActionContext::wg_fire_cannon;
+        creators["wg hurl boulder"] = &ActionContext::wg_hurl_boulder;
 
         // Vehicles
         creators["enter vehicle"] = &ActionContext::enter_vehicle;
@@ -447,6 +448,7 @@ private:
     static Action* wg_summon_vehicle(PlayerbotAI* botAI) { return new WgSummonVehicleAction(botAI); }
     static Action* wg_mount_tower_cannon(PlayerbotAI* botAI) { return new WgMountTowerCannonAction(botAI); }
     static Action* wg_fire_cannon(PlayerbotAI* botAI) { return new WgFireCannonAction(botAI); }
+    static Action* wg_hurl_boulder(PlayerbotAI* botAI) { return new WgHurlBoulderAction(botAI); }
 
     // Vehicles
     static Action* enter_vehicle(PlayerbotAI* botAI) { return new EnterVehicleAction(botAI); }

@@ -51,4 +51,11 @@ public:
     Unit* GetTarget() override;
 };
 
+class WgHurlBoulderAction : public CastVehicleSpellAction
+{
+public:
+    WgHurlBoulderAction(PlayerbotAI* botAI) : CastVehicleSpellAction(botAI, "hurl boulder") {}
+    Unit* GetTarget() override;
+};
+
 #endif

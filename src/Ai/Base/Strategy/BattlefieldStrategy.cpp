@@ -49,8 +49,8 @@ void WintergraspStrategy::InitTriggers(std::vector<TriggerNode*>& triggers)
     triggers.push_back(new TriggerNode("timer", {NextAction("enter vehicle", ACTION_MOVE + 8.0f)}));
 
     // Vehicle combat abilities; isPossible() limits each to applicable vehicle types.
-    // Low priority here for moving vehicles against creatures. Attacks on buildings and vehicles are handled in BattlefieldTactics.
-    triggers.push_back(new TriggerNode("in vehicle", {NextAction("hurl boulder", ACTION_MOVE + 1.0f)}));
+    // Ram is occasionally needed. The generic strategy for it is used at low priority.
     triggers.push_back(new TriggerNode("in vehicle", {NextAction("ram", ACTION_MOVE + 1.0f)}));
     triggers.push_back(new TriggerNode("in vehicle", {NextAction("wg fire cannon", ACTION_MOVE + 9.0f)}));
+    triggers.push_back(new TriggerNode("in vehicle", {NextAction("wg hurl boulder", ACTION_MOVE + 9.0f)}));
 }
