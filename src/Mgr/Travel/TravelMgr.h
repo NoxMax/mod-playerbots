@@ -882,6 +882,8 @@ public:
     std::vector<uint32> GetFlightNodesInZone(uint32 zoneId, TeamId team, uint32 excludeNode = 0) const;
     bool SelectAuctioneerByMap(Player* bot, NpcLocation& outAuctioneer);
     const std::vector<WorldLocation>& GetLocsPerLevelCache(uint8 level) { return locsPerLevelCache[level]; }
+    const std::unordered_map<uint32, std::vector<WorldPosition>>& GetFlightMastersByMap() const;
+    const std::unordered_map<uint32, std::vector<WorldPosition>>& GetInnkeepersByMap() const;
 
     template <class D, class W, class URBG>
     void weighted_shuffle(D first, D last, W first_weight, W last_weight, URBG&& g)
@@ -994,6 +996,8 @@ private:
     // Navigation caches
     std::map<uint32, FlightMasterInfo> allianceFlightMasterCache;
     std::map<uint32, FlightMasterInfo> hordeFlightMasterCache;
+    std::unordered_map<uint32, std::vector<WorldPosition>> flightMastersByMap;
+    std::unordered_map<uint32, std::vector<WorldPosition>> innkeepersByMap;
     std::map<uint8, std::vector<WorldLocation>> allianceHubsPerLevelCache;
     std::map<uint8, std::vector<WorldLocation>> hordeHubsPerLevelCache;
     std::map<uint8, std::vector<BankerLocation>> bankerLocsPerLevelCache;

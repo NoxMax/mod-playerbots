@@ -17,6 +17,8 @@
 #include "DBCEnums.h"
 #include "SharedDefines.h"
 
+class Player;
+
 enum class BotCheatMask : uint32
 {
     none = 0,
@@ -82,9 +84,10 @@ public:
     bool Initialize();
     bool IsInRandomAccountList(uint32 id);
     bool IsInRandomQuestItemList(uint32 id);
-    bool IsPvpProhibited(uint32 zoneId, uint32 areaId);
+    bool IsPvpProhibited(uint32 zoneId, uint32 areaId, Player* player = nullptr);
     bool IsInPvpProhibitedZone(uint32 id);
     bool IsInPvpProhibitedArea(uint32 id);
+    bool IsNearProtectedNPC(Player* player);
 
     bool enabled;
     bool disabledWithoutRealPlayer;
@@ -280,6 +283,8 @@ public:
     bool deleteRandomBotGuilds;
     std::vector<uint32> pvpProhibitedZoneIds;
     std::vector<uint32> pvpProhibitedAreaIds;
+    float pvpProhibitedFlightMasterDistance;
+    float pvpProhibitedInnkeeperDistance;
     bool fastReactInBG;
 
     bool randombotsWalkingRPG;

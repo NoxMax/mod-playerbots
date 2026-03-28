@@ -152,7 +152,7 @@ bool PetsAction::Execute(Event event)
             botAI->TellError(text);
             return false;
         }
-        if (sPlayerbotAIConfig.IsPvpProhibited(bot->GetZoneId(), bot->GetAreaId()) &&
+        if (sPlayerbotAIConfig.IsPvpProhibited(bot->GetZoneId(), bot->GetAreaId(), bot) &&
             (targetUnit->IsPlayer() || targetUnit->IsPet()) &&
             (!bot->duel || bot->duel->Opponent != targetUnit))
         {

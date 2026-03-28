@@ -4728,6 +4728,8 @@ void TravelMgr::PrepareDestinationCache()
                     info.dbGuid = guid;
                     allianceFlightMasterCache[guid] = info;
                 }
+
+                flightMastersByMap[mapId].push_back(pos);
                 flightMastersCount++;
 
                 // Zones that have flight masters but no innkeepers — use flight master as hub
@@ -4757,6 +4759,8 @@ void TravelMgr::PrepareDestinationCache()
             }
             else if (creatureTemplate->npcflag & UNIT_NPC_FLAG_INNKEEPER)
             {
+                innkeepersByMap[mapId].push_back(WorldPosition(mapId, x, y, z, orient));
+
                 if (zone2LevelBracket.find(areaId) == zone2LevelBracket.end())
                     continue;
 
@@ -4871,4 +4875,14 @@ void TravelMgr::PrepareDestinationCache()
         }
     }
     LOG_INFO("playerbots", ">> {} flight masters and {} innkeepers and {} banker locations for level collected.", flightMastersCount, innkeepersCount, bankerCount);
+}
+
+const std::unordered_map<uint32, std::vector<WorldPosition>>& TravelMgr::GetFlightMastersByMap() const
+{
+    return flightMastersByMap;
+}
+
+const std::unordered_map<uint32, std::vector<WorldPosition>>& TravelMgr::GetInnkeepersByMap() const
+{
+    return innkeepersByMap;
 }
