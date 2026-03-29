@@ -174,15 +174,6 @@ bool AttackersValue::IsPossibleTarget(Unit* attacker, Player* bot, float /*range
     if (!bot->CanSeeOrDetect(attacker))
         return false;
 
-    // Wintergrasp: Keep siege engine drivers focused on destroying walls
-    if (Vehicle* veh = bot->GetVehicle())
-    {
-        uint32 entry = veh->GetBase()->GetEntry();
-        if (entry == NPC_WINTERGRASP_SIEGE_ENGINE_ALLIANCE ||
-            entry == NPC_WINTERGRASP_SIEGE_ENGINE_HORDE)
-            return false;
-    }
-
     // PvP prohibition checks (skip for duels)
     if ((attacker->GetGUID().IsPlayer() || attacker->GetGUID().IsPet()) &&
         (!bot->duel || bot->duel->Opponent != attacker) &&
@@ -218,6 +209,12 @@ bool AttackersValue::IsPossibleTarget(Unit* attacker, Player* bot, float /*range
     if (c)
     {
         if (c->IsInEvadeMode())
+            return false;
+
+        // Wintergrasp: Infantry struggle to engage tower cannons as they can't navigate up a tower properly,
+        // unless they make a huge jump to it (which they have to when mounting one). As attackers however, they
+        // might target a cannon, can't get to it, and endup frozen in place. Thus this exception.
+        if (c->GetEntry() == NPC_WINTERGRASP_TOWER_CANNON && !bot->GetVehicle())
             return false;
 
         bool leaderHasThreat = false;
