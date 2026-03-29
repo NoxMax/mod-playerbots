@@ -8,22 +8,52 @@
 
 #include "GenericSpellActions.h"
 #include "MovementActions.h"
+#include <vector>
+
+class BattlefieldWG;
+
+struct WgWaypoint
+{
+    float  x, y, z;
+    uint32 pathBlock = 0;       // WorldState ID of the building blocking this waypoint (0 = none)
+    bool   noSkip    = false;   // true = bot must reach this node before advancing past it
+};
+
+using WgPath = std::vector<WgWaypoint>;
 
 class WgCheckFlagAction : public MovementAction
 {
 public:
     WgCheckFlagAction(PlayerbotAI* botAI) : MovementAction(botAI, "wg check flag"),
-        m_attackerWpIdx(0), m_defenderWpIdx(0), m_vehicleWpIdx(0),
-        m_workshopWpIdx(0xFF), m_workshopPathId(0xFF), m_goingToWorkshop(false) {}
+        m_botGuidRaw(0), m_routeStep(0), m_atkVehiclePhase(0), m_defVehiclePhase(0),
+        m_atkGoingToWorkshop(false), m_defGoingToWorkshop(false),
+        m_workshopIdx(0xFF), m_targetTowerIdx(0xFF)
+    {
+        // Cached here so the destructor can remove this bot from s_WgCapturingWorkshop.
+        // Bot may no longer be valid when the destructor runs.
+        if (bot) m_botGuidRaw = bot->GetGUID().GetRawValue();
+    }
     ~WgCheckFlagAction() override;
     bool Execute(Event event) override;
+
+    // Returns true while this bot is actively navigating to capture a workshop.
+    // Used by combat target value filters to suppress combat for workshop capture bots.
+    static bool IsCapturingWorkshop(Player* bot);
+
 private:
-    uint8 m_attackerWpIdx;      // On foot attacker path index to fortress, from spawn.
-    uint8 m_defenderWpIdx;      // On foot defender path index to fortress, from graveyard behind fortress.
-    uint8 m_vehicleWpIdx;       // In vehicle attacker path index to fortress, from friendly workshop.
-    uint8 m_workshopWpIdx;      // On foot attacker path index to friendly workshop. Inverse of m_vehicleWpIdx.
-    uint8 m_workshopPathId;     // Active path index in WG_WORKSHOP_PATHS being used.
-    bool  m_goingToWorkshop;    // True when this bot is counted in s_WgBotsGoingToWorkshop.
+    void ResetBattleState();
+    bool FollowWgRoute(Position const& objective, bool checkPathBlock);
+    bool TryCaptureWorkshop(BattlefieldWG* wg);
+
+    uint64_t            m_botGuidRaw;           // Cached bot GUID for safe use in destructor
+    std::vector<uint32> m_route;
+    uint32              m_routeStep;
+    uint8               m_atkVehiclePhase;
+    uint8               m_defVehiclePhase;
+    bool                m_atkGoingToWorkshop;
+    bool                m_defGoingToWorkshop;
+    uint8               m_workshopIdx;          // Index into WG_WORKSHOPS[]
+    uint8               m_targetTowerIdx;       // Index into DEF_TOWERS[]
 };
 
 class WgSummonVehicleAction : public MovementAction
@@ -40,8 +70,10 @@ public:
     bool Execute(Event event) override;
 
 private:
-    ObjectGuid m_targetCannon;          // GUID of the cannon the bot is heading to.
-    uint32     m_cannonScanTime = 0;    // Timestamp of the next scan for free cannons. Staggered per bot level.
+    void ResetBattleState();
+
+    ObjectGuid m_targetCannon;
+    uint32     m_cannonScanTime = 0;
 };
 
 class WgFireCannonAction : public CastVehicleSpellAction

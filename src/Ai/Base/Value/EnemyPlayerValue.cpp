@@ -5,6 +5,7 @@
  */
 
 #include "EnemyPlayerValue.h"
+#include "BattlefieldTactics.h"
 #include "CombatManager.h"
 #include "Playerbots.h"
 #include "ServerFacade.h"
@@ -53,6 +54,10 @@ Unit* EnemyPlayerValue::Calculate()
         else
             controllingVehicle = true;
     }
+
+    // Wintergrasp: Workshop capture bots push to objective without engaging in combat.
+    if (WgCheckFlagAction::IsCapturingWorkshop(bot))
+        return nullptr;
 
     // 1. Check units we are currently in PvP combat with.
     std::vector<Unit*> targets;
