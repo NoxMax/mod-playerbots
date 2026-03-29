@@ -7,6 +7,7 @@
 #include "AttackersValue.h"
 
 #include "BattlefieldWG.h"
+#include "BattlefieldTactics.h"
 #include "CellImpl.h"
 #include "Vehicle.h"
 #include "GridNotifiers.h"
@@ -172,6 +173,10 @@ bool AttackersValue::IsPossibleTarget(Unit* attacker, Player* bot, float /*range
 
     // Visibility check
     if (!bot->CanSeeOrDetect(attacker))
+        return false;
+
+    // Wintergrasp: Workshop capture bots push to objective without engaging in combat.
+    if (WgCheckFlagAction::IsCapturingWorkshop(bot))
         return false;
 
     // PvP prohibition checks (skip for duels)
