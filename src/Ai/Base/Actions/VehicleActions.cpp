@@ -7,8 +7,6 @@
 #include "VehicleActions.h"
 
 #include "BattlegroundIC.h"
-#include "Battlefield.h"
-#include "BattlefieldMgr.h"
 #include "BattlefieldWG.h"
 #include "ItemVisitors.h"
 #include "ObjectDefines.h"
@@ -53,20 +51,15 @@ bool EnterVehicleAction::Execute(Event event)
         if (vehicleBase->HasUnitFlag(UNIT_FLAG_NOT_SELECTABLE))
             continue;
 
-        // IoC-specific: dont let bots get in the cannons as they'll stay forever and do nothing useful,
-        // and the catapult can't be driven by bots
-        if (vehicleBase->GetEntry() == NPC_KEEP_CANNON || vehicleBase->GetEntry() == NPC_CATAPULT)
-            continue;
-
-        // Faction check before the more expensive battlefield lookup
+        // Faction check before the more expensive lookups
         if (!vehicleBase->IsFriendlyTo(bot))
             continue;
 
         uint32 entry = vehicleBase->GetEntry();
 
-        // Tower cannons are custom handled only by WgMountTowerCannonAction in BattlefieldTactics.
-        // This check ensures a future extension for attacker cannons also routes through that action.
-        if (entry == NPC_WINTERGRASP_TOWER_CANNON)
+        // IoC-specific: dont let bots get in the cannons as they'll stay forever and do nothing useful,
+        // and the catapults can't be used by bots since they are non-attacking vehicles.
+        if (entry == NPC_KEEP_CANNON || entry == NPC_CATAPULT)
             continue;
 
         // Wintergrasp vehicles are custom handled in BattlefieldTactics.
@@ -77,11 +70,7 @@ bool EnterVehicleAction::Execute(Event event)
             entry == NPC_WINTERGRASP_DEMOLISHER             ||
             entry == NPC_WINTERGRASP_SIEGE_ENGINE_ALLIANCE  ||
             entry == NPC_WINTERGRASP_SIEGE_ENGINE_HORDE)
-        {
-            Battlefield* bf = sBattlefieldMgr->GetBattlefieldByBattleId(BATTLEFIELD_BATTLEID_WG);
-            if (bf && bf->IsWarTime() && bot->GetTeamId() == bf->GetDefenderTeam())
-                continue;
-        }
+            continue;
 
         Vehicle* vehKit = vehicleBase->GetVehicleKit();
         if (!vehKit || !vehKit->GetAvailableSeatCount())
