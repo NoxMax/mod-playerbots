@@ -545,24 +545,13 @@ int32 CheckMountStateAction::CalculateMasterMountSpeed(Player* master) const
             return 149;
         return 59;  // walk pace
     }
-    else
-    {
-        // Bots on their own.
-        int32 speed = mountData.maxSpeed;
-        // In BG or WG (no-fly zones), cap at ground-mount speed so the mount filter
-        // doesn't skip all ground mounts in favour of inaccessible flying mounts.
-        if ((bot->InBattleground() || bot->GetZoneId() == AREA_WINTERGRASP) && speed > 99)
-            return 99;
 
-        return speed;
-    }
-
-    // No real master OR battleground: pick speed by skill tier.
-    if (!bot->InBattleground() && BotCanUseFlyingMount(bot))
+    // No real master OR BG/WG (no-fly zones): pick speed by skill tier.
+    if (!bot->InBattleground() && !BotInBattlefield(bot) && BotCanUseFlyingMount(bot))
         return (ridingSkill >= 300) ? 279 : 149;
 
     int32 maxGround = (ridingSkill >= 150) ? 99 : 59;
-    if (bot->InBattleground() && maxGround > 99)
+    if ((bot->InBattleground() || BotInBattlefield(bot)) && maxGround > 99)
         maxGround = 99;
     return maxGround;
 }
@@ -572,7 +561,7 @@ uint32 CheckMountStateAction::GetMountType(Player* master) const
     bool const noRealMaster = (!master || master == bot);
 
     if (noRealMaster)
-        return (!bot->InBattleground() && BotCanUseFlyingMount(bot)) ? 1 : 0;
+        return (!bot->InBattleground() && !BotInBattlefield(bot) && BotCanUseFlyingMount(bot)) ? 1 : 0;
 
     auto auraEffects = master->GetAuraEffectsByType(SPELL_AURA_MOUNTED);
     if (!auraEffects.empty())
