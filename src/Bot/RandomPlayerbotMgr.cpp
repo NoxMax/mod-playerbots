@@ -2890,6 +2890,7 @@ void RandomPlayerbotMgr::PrintStats()
     uint32 moving = 0;
     uint32 mounted = 0;
     uint32 inBg = 0;
+    uint32 inWG = 0;
     uint32 rest = 0;
     uint32 engine_noncombat = 0;
     uint32 engine_combat = 0;
@@ -2956,6 +2957,9 @@ void RandomPlayerbotMgr::PrintStats()
 
         if (bot->InBattleground() || bot->InArena())
             ++inBg;
+
+        if (BotInBattlefield(bot))
+            ++inWG;
 
         if (bot->HasFlag(PLAYER_FLAGS, PLAYER_FLAGS_RESTING))
             ++rest;
@@ -3051,7 +3055,8 @@ void RandomPlayerbotMgr::PrintStats()
     LOG_INFO("playerbots", "    On mount: {}", mounted);
     LOG_INFO("playerbots", "    In combat: {}", combat);
     LOG_INFO("playerbots", "    In BG: {}", inBg);
-    LOG_INFO("playerbots", "    In Rest: {}", rest);
+    LOG_INFO("playerbots", "    In WG: {}", inWG);
+    LOG_INFO("playerbots", "    Resting: {}", rest);
     LOG_INFO("playerbots", "    Dead: {}", dead);
 
     if (sPlayerbotAIConfig.enableNewRpgStrategy)
