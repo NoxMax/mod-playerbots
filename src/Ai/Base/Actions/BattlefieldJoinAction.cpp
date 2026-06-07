@@ -75,13 +75,6 @@ bool BfStrategyCheckAction::Execute(Event /*event*/)
         botAI->ChangeStrategy("-wintergrasp", BOT_STATE_NON_COMBAT);
         botAI->ChangeStrategy("-wintergrasp", BOT_STATE_COMBAT);
         LOG_INFO("playerbots", "Bot {} <{}> deactivates Wintergrasp strategy", bot->GetGUID().ToString(), bot->GetName());
-        // Remove random bots from their group when the WG battle ends. Group::RemoveMember handles auto-disband
-        // when the last member leaves. TODO: This group cleaning logic exists in core for leaving BGs, but not
-        // for WG (MAR 2026), so this cleanup will become redundant if that's added later in core.
-        if (sRandomPlayerbotMgr.IsRandomBot(bot))
-            if (Group* group = bot->GetGroup())
-                group->RemoveMember(bot->GetGUID());
-
         return true;
     }
     return false;
