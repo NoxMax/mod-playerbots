@@ -442,7 +442,7 @@ void PlayerbotAI::UpdateAIGroupMaster()
 
     // Don't reassign master while the bot is in a WG raid group.
     Battlefield* wg = sBattlefieldMgr->GetBattlefieldByBattleId(BATTLEFIELD_BATTLEID_WG);
-    if (IsRandomBot && wg && wg->GetGroupPlayer(bot->GetGUID(), bot->GetTeamId()))
+    if (wg && wg->GetGroupPlayer(bot->GetGUID(), bot->GetTeamId()))
         return;
 
     if (!master || (masterBotAI && !masterBotAI->IsRealPlayer()))
@@ -454,25 +454,20 @@ void PlayerbotAI::UpdateAIGroupMaster()
             botAI->SetMaster(newMaster);
             botAI->ResetStrategies();
 
-            if (!bot->InBattleground())
+            if (!bot->InBattleground() && !BotInBattlefield(bot))
             {
-                botAI->ChangeStrategy("+follow", BOT_STATE_NON_COMBAT);
+                if (botAI->GetMaster() == botAI->GetGroupLeader())
+                    botAI->TellMaster(PlayerbotTextMgr::instance().GetBotTextOrDefault(
+                        "hello_follow", "Hello, I follow you!", {}));
+                else
+                    botAI->TellMaster(PlayerbotTextMgr::instance().GetBotTextOrDefault(
+                        "hello", "Hello!", {}));
 
-                if (!BotInBattlefield(bot))
-                {
-                    if (botAI->GetMaster() == botAI->GetGroupLeader())
-                        botAI->TellMaster(PlayerbotTextMgr::instance().GetBotTextOrDefault(
-                            "hello_follow", "Hello, I follow you!", {}));
-                    else
-                        botAI->TellMaster(PlayerbotTextMgr::instance().GetBotTextOrDefault(
-                            "hello", "Hello!", {}));
-                }
+                botAI->ChangeStrategy("+follow", BOT_STATE_NON_COMBAT);
             }
+            // Bot is in a battleground or Wintergrasp battlefield; focus on the objective.
             else
-            {
-                // we're in a battleground, stay with the pack and focus on objective
                 botAI->ChangeStrategy("-follow", BOT_STATE_NON_COMBAT);
-            }
         }
     }
 }
