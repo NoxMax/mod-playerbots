@@ -328,16 +328,9 @@ bool SpiritHealerAction::Execute(Event /*event*/)
         // If not in any queue and no friendly Spirit Guide is nearby, fall through immediately.
         if (Battlefield* bf = sBattlefieldMgr->GetBattlefieldToZoneId(bot->GetZoneId()); bf && bf->IsWarTime())
         {
-            // Definitive queue check: SPELL_WAITING_FOR_RESURRECT is not always a reliable check,
-            // so verify directly via BfGraveyard::HasPlayer().
-            for (uint8 i = 0; i < BATTLEFIELD_WG_GRAVEYARD_MAX; i++)
-            {
-                if (BfGraveyard* gy = bf->GetGraveyardById(i))
-                {
-                    if (gy->HasPlayer(bot->GetGUID()))
-                        return false;  // Confirmed in queue. Wait for resurrection.
-                }
-            }
+            // The aura is applied on AddPlayerToResurrectQueue and removed on resurrection.
+            if (bot->HasAura(SPELL_WAITING_FOR_RESURRECT))
+                return false;   // Confirmed in queue. Wait for resurrection.
 
             // Not in any queue. Try to register with the faction's Spirit Guide.
             // Search by entry directly. The nearest NPCs cache may be stale after graveyard teleport.
@@ -353,7 +346,7 @@ bool SpiritHealerAction::Execute(Event /*event*/)
                     WorldPacket packet(CMSG_AREA_SPIRIT_HEALER_QUEUE);
                     packet << guide->GetGUID();
                     bot->GetSession()->HandleAreaSpiritHealerQueueOpcode(packet);
-                    return true;  // Queued or will be. Verify next tick via HasPlayer()
+                    return true;  // Queued. Verify next tick via HasAura(SPELL_WAITING_FOR_RESURRECT).
                 }
             }
             // No friendly Spirit Guide found. Fall through to Spirit Healer.
