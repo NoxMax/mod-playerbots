@@ -26,8 +26,9 @@ class WgCheckFlagAction : public MovementAction
 public:
     WgCheckFlagAction(PlayerbotAI* botAI) : MovementAction(botAI, "wg check flag"),
         m_botGuidRaw(0), m_routeStep(0), m_atkVehiclePhase(0), m_defVehiclePhase(0),
-        m_atkGoingToWorkshop(false), m_defGoingToWorkshop(false),
-        m_workshopIdx(0xFF), m_targetTowerIdx(0xFF)
+        m_atkGoingToWorkshop(false), m_defGoingToWorkshop(false), m_workshopIdx(0xFF),
+        m_isFortGuard(false), m_defGuardFortress(0), m_defGuardFortressTime(0), m_targetTowerIdx(0xFF),
+        m_isTowerAttacker(false), m_captureWsIdx(0xFF), m_arrivedAtCapture(false)
     {
         // Cached here so the destructor can remove this bot from s_WgCapturingWorkshop.
         // Bot may no longer be valid when the destructor runs.
@@ -53,7 +54,14 @@ private:
     bool                m_atkGoingToWorkshop;
     bool                m_defGoingToWorkshop;
     uint8               m_workshopIdx;          // Index into WG_WORKSHOPS[]
+    bool                m_isFortGuard;          // True while this bot holds a fort guard vehicle slot
+    uint8               m_defGuardFortress;     // 0=unassigned, 1=hisGuardAtStage, 2=hisGuardAtGate, 3=hisGuardAtOtherSide
+    uint32              m_defGuardFortressTime; // Timestamp of last guard position assignment evaluation
     uint8               m_targetTowerIdx;       // Index into DEF_TOWERS[]
+    bool                m_isTowerAttacker;      // True while this bot holds a tower squad slot
+    uint8               m_captureWsIdx;         // Workshop this bot is assigned to capture (0xFF = none)
+    bool                m_arrivedAtCapture;     // Latch: set on first arrival; suppression never re-activates
+                                                //   until assignment changes
 };
 
 class WgSummonVehicleAction : public MovementAction
