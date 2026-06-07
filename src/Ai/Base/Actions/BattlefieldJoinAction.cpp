@@ -39,7 +39,7 @@ static bool AcceptEntryInvite(Player* bot, PlayerbotAI* botAI, uint32 battleId)
     return true;
 }
 
-bool BfStrategyCheckAction::Execute(Event event)
+bool BfStrategyCheckAction::Execute(Event /*event*/)
 {
     bool inActiveWG = BotInBattlefield(bot);
 
