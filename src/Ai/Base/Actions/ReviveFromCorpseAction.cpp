@@ -6,6 +6,7 @@
 
 #include "ReviveFromCorpseAction.h"
 
+#include "BattlefieldMgr.h"
 #include "BattlefieldWG.h"
 #include "Battleground.h"
 #include "Event.h"
@@ -84,7 +85,7 @@ bool FindCorpseAction::Execute(Event /*event*/)
 
     // Wintergrasp: Resurrect at the graveyard via spirit guide or healer.
     // Due to the nature of Wintergrasp being part of the open world, it cannot simply return false like BGs.
-    if (BotInBattlefield(bot))
+    if (bot->InBattlefield())
         return botAI->DoSpecificAction("spirit healer");
 
     Player* groupLeader = botAI->GetGroupLeader();

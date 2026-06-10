@@ -454,7 +454,7 @@ void PlayerbotAI::UpdateAIGroupMaster()
             botAI->SetMaster(newMaster);
             botAI->ResetStrategies();
 
-            if (!bot->InBattleground() && !BotInBattlefield(bot))
+            if (!bot->InBattleground() && !bot->InBattlefield())
             {
                 if (botAI->GetMaster() == botAI->GetGroupLeader())
                     botAI->TellMaster(PlayerbotTextMgr::instance().GetBotTextOrDefault(
@@ -4655,7 +4655,7 @@ bool PlayerbotAI::AllowActive(ActivityType activityType)
     // Wintergrasp is on the overworld map (571) so the check above doesn't exempt it.
     // During active wartime treat it like a BG: always allow activity.
     // Outside wartime (NoBattleTimer) smart scaling applies normally.
-    if (BotInBattlefield(bot))
+    if (bot->InBattlefield())
         return true;
 
     // bot is in a guild that contains a real player

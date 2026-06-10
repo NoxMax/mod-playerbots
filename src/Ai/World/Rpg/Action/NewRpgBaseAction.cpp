@@ -99,7 +99,7 @@ bool NewRpgBaseAction::MoveFarTo(WorldPosition dest)
     {
         // Do not teleport "stuck" bots in Wintergrasp during an active battle. It misinterprets the WG navigation system,
         // creates false positives for being stuck, and teleports the bot to a random place in the map it shouldn't be.
-        if (BotInBattlefield(bot))
+        if (bot->InBattlefield())
         {
             botAI->rpgInfo.stuckTs = getMSTime();
             botAI->rpgInfo.stuckAttempts = 0;

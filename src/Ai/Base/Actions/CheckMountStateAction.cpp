@@ -6,9 +6,6 @@
 
 #include "CheckMountStateAction.h"
 #include "AreaDefines.h"
-#include "Battlefield.h"
-#include "BattlefieldMgr.h"
-#include "BattlefieldWG.h"
 #include "BattleGroundTactics.h"
 #include "BattlegroundEY.h"
 #include "BattlegroundWS.h"
@@ -119,7 +116,7 @@ bool CheckMountStateAction::Execute(Event /*event*/)
     bool const noRealMaster = (!master || master == bot);
 
     // Treat bots in WG battles like a BG: they should mount independently of any master.
-    if (!inBattleground && BotInBattlefield(bot))
+    if (!inBattleground && bot->InBattlefield())
         inBattleground = true;
 
     // If there is a master and bot not in BG, follow master's mount state regardless of group leader
@@ -547,11 +544,11 @@ int32 CheckMountStateAction::CalculateMasterMountSpeed(Player* master) const
     }
 
     // No real master OR BG/WG (no-fly zones): pick speed by skill tier.
-    if (!bot->InBattleground() && !BotInBattlefield(bot) && BotCanUseFlyingMount(bot))
+    if (!bot->InBattleground() && !bot->InBattlefield() && BotCanUseFlyingMount(bot))
         return (ridingSkill >= 300) ? 279 : 149;
 
     int32 maxGround = (ridingSkill >= 150) ? 99 : 59;
-    if ((bot->InBattleground() || BotInBattlefield(bot)) && maxGround > 99)
+    if ((bot->InBattleground() || bot->InBattlefield()) && maxGround > 99)
         maxGround = 99;
     return maxGround;
 }
@@ -561,7 +558,7 @@ uint32 CheckMountStateAction::GetMountType(Player* master) const
     bool const noRealMaster = (!master || master == bot);
 
     if (noRealMaster)
-        return (!bot->InBattleground() && !BotInBattlefield(bot) && BotCanUseFlyingMount(bot)) ? 1 : 0;
+        return (!bot->InBattleground() && !bot->InBattlefield() && BotCanUseFlyingMount(bot)) ? 1 : 0;
 
     auto auraEffects = master->GetAuraEffectsByType(SPELL_AURA_MOUNTED);
     if (!auraEffects.empty())
