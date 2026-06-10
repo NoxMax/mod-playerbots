@@ -700,9 +700,15 @@ static uint32 WgWsToGoEntry(uint32 ws)
 }
 
 // Returns true if the building with the given WorldState ID is in a destroyed state.
-// Internally caches a bitfield of all building states, refreshed at most once per second.
+// Internally caches a bitfield of all building states, refreshed at most once per second by
+// querying BattlefieldWG::IsBuildingDestroyed for each tracked WorldState.
 static bool WgIsBuildingDestroyed(BattlefieldWG* wg, uint32 worldState)
 {
+    static constexpr uint32 WG_TRACKED_WORLDSTATES[] = {
+        WG_WS_FORTRESS_GATE, WG_WS_EAST_WALL, WG_WS_WEST_WALL,   WG_WS_CENTRAL_WALL,
+        WG_WS_VAULT_DOOR,    WG_WS_TOWER_SE,  WG_WS_TOWER_SOUTH, WG_WS_TOWER_SW,
+    };
+
     static uint8  s_destroyedMask = 0;
     static uint32 s_cacheTime     = 0;
 
@@ -710,14 +716,12 @@ static bool WgIsBuildingDestroyed(BattlefieldWG* wg, uint32 worldState)
     if (now - s_cacheTime > 1000 || s_cacheTime == 0)
     {
         s_cacheTime = now;
-        s_destroyedMask = 0;
-        for (BfWGGameObjectBuilding* b : wg->GetBuildingsInZone())
-        {
-            if (b->m_State == BATTLEFIELD_WG_OBJECTSTATE_NEUTRAL_DESTROY  ||
-                b->m_State == BATTLEFIELD_WG_OBJECTSTATE_HORDE_DESTROY    ||
-                b->m_State == BATTLEFIELD_WG_OBJECTSTATE_ALLIANCE_DESTROY)
-                s_destroyedMask |= WgWsToBit(b->m_WorldState);
-        }
+        // Build into a local and assign once, so readers never see a partially rebuilt mask.
+        uint8 mask = 0;
+        for (uint32 ws : WG_TRACKED_WORLDSTATES)
+            if (wg->IsBuildingDestroyed(ws))
+                mask |= WgWsToBit(ws);
+        s_destroyedMask = mask;
     }
 
     return (s_destroyedMask & WgWsToBit(worldState)) != 0;
