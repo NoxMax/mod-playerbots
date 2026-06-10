@@ -5,8 +5,6 @@
  */
 
 #include "AiFactory.h"
-#include "Battlefield.h"
-#include "BattlefieldMgr.h"
 #include "BattlegroundMgr.h"
 #include "DKAiObjectContext.h"
 #include "DruidAiObjectContext.h"
@@ -504,7 +502,7 @@ void AiFactory::AddDefaultCombatStrategies(Player* player, PlayerbotAI* const fa
     if (sRandomPlayerbotMgr.IsRandomBot(player) && sPlayerbotAIConfig.RandomBotJoinBF && !player->InBattleground())
     {
         engine->addStrategy("bf", false);
-        if (BotInBattlefield(player))
+        if (player->InBattlefield())
             engine->addStrategy("wintergrasp", false);
     }
 }
@@ -619,7 +617,7 @@ void AiFactory::AddDefaultNonCombatStrategies(Player* player, PlayerbotAI* const
         if (sPlayerbotAIConfig.RandomBotJoinBF)
         {
             nonCombatEngine->addStrategy("bf", false);
-            if (BotInBattlefield(player))
+            if (player->InBattlefield())
                 nonCombatEngine->addStrategy("wintergrasp", false);
         }
 

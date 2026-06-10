@@ -41,7 +41,7 @@ static bool AcceptEntryInvite(Player* bot, PlayerbotAI* botAI, uint32 battleId)
 
 bool BfStrategyCheckAction::Execute(Event /*event*/)
 {
-    bool inActiveWG = BotInBattlefield(bot);
+    bool inActiveWG = bot->InBattlefield();
 
     // Process pending WG invites (stored when packets arrived, processed here to work in combat mode)
     if (botAI->pendingWgQueueInviteBattleId)

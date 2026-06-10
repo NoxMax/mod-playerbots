@@ -1400,7 +1400,7 @@ void RandomPlayerbotMgr::CheckWgQueue()
                 if (static_cast<uint8>(bot->GetTeamId()) != team)
                     continue;
 
-                if (!wg->IsPlayerInWar(bot))
+                if (!wg->IsPlayerInBattlefield(bot->GetGUID()))
                     continue;
 
                 LOG_DEBUG("playerbots", "WG slot priority: ejecting bot {} to free slot for real player",
@@ -1652,7 +1652,7 @@ bool RandomPlayerbotMgr::ProcessBot(Player* bot)
     if (bot->InBattlegroundQueue())
         return false;
 
-    if (BotInBattlefield(bot))
+    if (bot->InBattlefield())
         return false;
 
      uint32 botId = bot->GetGUID().GetCounter();
@@ -1793,7 +1793,7 @@ void RandomPlayerbotMgr::RandomTeleport(Player* bot, std::vector<WorldLocation>&
         return;
 
     // ignore when in an active battlefield (Wintergrasp).
-    if (BotInBattlefield(bot))
+    if (bot->InBattlefield())
         return;
 
     // ignore when in group (e.g. world, dungeons, raids) and leader is not a player.
@@ -1997,7 +1997,7 @@ void RandomPlayerbotMgr::RandomTeleportForLevel(Player* bot)
     if (bot->InBattleground())
         return;
 
-    if (BotInBattlefield(bot))
+    if (bot->InBattlefield())
         return;
 
     if (bot->GetLevel() >= 10 && urand(0, 100) < sPlayerbotAIConfig.ProbTeleToBankers * 100)
@@ -2096,7 +2096,7 @@ void RandomPlayerbotMgr::RandomTeleportGrindForLevel(Player* bot)
     if (bot->InBattleground())
         return;
 
-    if (BotInBattlefield(bot))
+    if (bot->InBattlefield())
         return;
 
     std::vector<WorldLocation> locs = sTravelMgr.GetTeleportLocations(bot);
@@ -2111,7 +2111,7 @@ void RandomPlayerbotMgr::RandomTeleport(Player* bot)
     if (bot->InBattleground())
         return;
 
-    if (BotInBattlefield(bot))
+    if (bot->InBattlefield())
         return;
 
     PerfMonitorOperation* pmo = sPerfMonitor.start(PERF_MON_RNDBOT, "RandomTeleport");
@@ -2153,7 +2153,7 @@ void RandomPlayerbotMgr::Randomize(Player* bot)
     if (bot->InBattleground())
         return;
 
-    if (BotInBattlefield(bot))
+    if (bot->InBattlefield())
         return;
 
     if (bot->GetLevel() < 3 || (bot->GetLevel() < 56 && bot->getClass() == CLASS_DEATH_KNIGHT))
@@ -2384,7 +2384,7 @@ void RandomPlayerbotMgr::Refresh(Player* bot)
     if (bot->InBattleground())
         return;
 
-    if (BotInBattlefield(bot))
+    if (bot->InBattlefield())
         return;
 
     LOG_DEBUG("playerbots", "Refreshing bot {} <{}>", bot->GetGUID().ToString().c_str(), bot->GetName().c_str());
@@ -2833,7 +2833,7 @@ void RandomPlayerbotMgr::OnPlayerLogout(Player* player)
         if (botAI && player == botAI->GetMaster())
         {
             botAI->SetMaster(nullptr);
-            if (!bot->InBattleground() && !BotInBattlefield(bot))
+            if (!bot->InBattleground() && !bot->InBattlefield())
                 botAI->ResetStrategies();
         }
     }
@@ -2901,7 +2901,7 @@ void RandomPlayerbotMgr::OnPlayerLogin(Player* player)
             PlayerbotAI* botAI = GET_PLAYERBOT_AI(bot);
             if (botAI && member == player && (!botAI->GetMaster() || GET_PLAYERBOT_AI(botAI->GetMaster())))
             {
-                if (!bot->InBattleground() && !BotInBattlefield(bot))
+                if (!bot->InBattleground() && !bot->InBattlefield())
                 {
                     botAI->SetMaster(player);
                     botAI->ResetStrategies();
@@ -3095,7 +3095,7 @@ void RandomPlayerbotMgr::PrintStats()
         if (bot->InBattleground() || bot->InArena())
             ++inBg;
 
-        if (BotInBattlefield(bot))
+        if (bot->InBattlefield())
             ++inWG;
 
         if (bot->HasFlag(PLAYER_FLAGS, PLAYER_FLAGS_RESTING))
