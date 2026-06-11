@@ -1297,10 +1297,46 @@ void RandomPlayerbotMgr::CheckWgQueue()
             std::vector<Player*> eligible;
             for (auto& [guid, bot] : playerBots)
             {
-                if (!bot || !bot->IsInWorld() || !IsRandomBot(bot))
+                // Basic ineligibilities.
+                if (!bot)
+                    continue;
+                if (!bot->IsInWorld() || !IsRandomBot(bot))
                     continue;
                 if (bot->GetLevel() < minLevel)
                     continue;
+
+                // Skip dead or mid-teleport bots.
+                if (!bot->IsAlive() || bot->IsBeingTeleported())
+                    continue;
+
+                // Skip bots in battlegrounds/arenas and their queues.
+                if (bot->InBattleground() || bot->InBattlegroundQueue())
+                    continue;
+
+                // Skip bots in dungeons or raids.
+                if (Map* map = bot->GetMap(); map && map->IsDungeon())
+                    continue;
+
+                // Skip bots with a real player master or have a real player in their group.
+                PlayerbotAI* botAI = GET_PLAYERBOT_AI(bot);
+                if (botAI && botAI->HasRealPlayerMaster())
+                    continue;
+                if (Group* group = bot->GetGroup())
+                {
+                    bool servesRealPlayer = false;
+                    for (GroupReference* gref = group->GetFirstMember(); gref; gref = gref->next())
+                    {
+                        Player* member = gref->GetSource();
+                        if (member && !GET_PLAYERBOT_AI(member))
+                        {
+                            servesRealPlayer = true;
+                            break;
+                        }
+                    }
+                    if (servesRealPlayer)
+                        continue;
+                }
+
                 eligible.push_back(bot);
             }
 
