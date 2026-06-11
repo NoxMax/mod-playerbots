@@ -895,38 +895,14 @@ static Creature* WgFindNearestHostileVehicle(Player* bot, float scanRange)
 // ######################################################################################################################################### //
 WgCheckFlagAction::~WgCheckFlagAction()
 {
-    if (m_atkGoingToWorkshop)
-        --s_WgAtkGoingToWorkshop;
-    if (m_defGoingToWorkshop)
-        --s_WgDefGoingToWorkshop;
-    if (m_isFortGuard)
-        --s_WgFortGuardVehicles;
-    if (m_defGuardFortress == 1)
-        --s_WgFortGuardAtStage;
-    else if (m_defGuardFortress == 2)
-        --s_WgFortGuardAtGate;
-    else if (m_defGuardFortress == 3)
-        --s_WgFortGuardAtOtherSide;
-    if (m_isTowerAttacker)
-        --s_WgTowerSquad[m_targetTowerIdx];
-    if (m_botGuidRaw)
-    {
-        std::lock_guard<std::mutex> lock(s_WgCapturingWorkshopMtx);
-        s_WgCapturingWorkshop.erase(m_botGuidRaw);
-    }
+    ClearSharedTracking();
 }
 
-// Resets all per-bot battle state: route, phases, workshop slots, and capture tracking.
-// Called on death or end of battle.
-void WgCheckFlagAction::ResetBattleState()
+// Releases the bot's claims on shared trackers: the workshop-goer, fort guard, and tower squad counters,
+// plus the bot's s_WgCapturingWorkshop entry. If there are bot pointers to clear, they belong in ResetBattleState,
+// never here, as the destructor calls ClearSharedTracking when the bot may already be deleted.
+void WgCheckFlagAction::ClearSharedTracking()
 {
-    m_route.clear();
-    m_routeStep        = 0;
-    m_atkVehiclePhase  = 0;
-    m_defVehiclePhase  = 0;
-    m_workshopIdx      = 0xFF;
-    m_captureWsIdx     = 0xFF;
-    m_arrivedAtCapture = false;
     if (m_atkGoingToWorkshop)
     {
         m_atkGoingToWorkshop = false;
@@ -962,7 +938,21 @@ void WgCheckFlagAction::ResetBattleState()
     }
 }
 
-// Routes a percentage of infantry bots to captureworkshops, latching them on arrival until capture succeeds.
+// Resets all per-bot battle state: shared counters, route, phases, and capture assignment.
+// Called on death and by BfStrategyCheckAction when it deactivates the strategy at end of battle.
+void WgCheckFlagAction::ResetBattleState()
+{
+    ClearSharedTracking();
+    m_route.clear();
+    m_routeStep        = 0;
+    m_atkVehiclePhase  = 0;
+    m_defVehiclePhase  = 0;
+    m_workshopIdx      = 0xFF;
+    m_captureWsIdx     = 0xFF;
+    m_arrivedAtCapture = false;
+}
+
+// Routes a percentage of infantry bots to capture workshops, latching them on arrival until capture succeeds.
 bool WgCheckFlagAction::TryCaptureWorkshop(BattlefieldWG* wg)
 {
     TeamId team = bot->GetTeamId();
@@ -1065,6 +1055,11 @@ bool WgCheckFlagAction::IsCapturingWorkshop(Player* bot)
 {
     if (!bot)
         return false;
+
+    // Prevents possible stale entry (a bot whose ResetBattleState never ran) from suppressing combat outside Wintergrasp.
+    if (!bot->InBattlefield())
+        return false;
+
     std::lock_guard<std::mutex> lock(s_WgCapturingWorkshopMtx);
     return s_WgCapturingWorkshop.count(bot->GetGUID().GetRawValue()) > 0;
 }
@@ -1256,6 +1251,7 @@ bool WgCheckFlagAction::FollowWgRoute(Position const& objective, bool checkPathB
 bool WgCheckFlagAction::Execute(Event /*event*/)
 {
     BattlefieldWG* wg = GetBattlefieldWG();
+    // Defensive reset. The main reset outside battle is done by BfStrategyCheckAction.
     if (!wg || !wg->IsWarTime())
     {
         ResetBattleState();
@@ -2040,7 +2036,7 @@ bool WgSummonVehicleAction::Execute(Event /*event*/)
     return true;
 }
 
-void WgMountTowerCannonAction::ResetBattleState()
+void WgMountTowerCannonAction::ResetCannonState()
 {
     m_cannonScanTime = 0;
     m_targetCannon.Clear();
@@ -2055,12 +2051,12 @@ bool WgMountTowerCannonAction::Execute(Event /*event*/)
     BattlefieldWG* wg = GetBattlefieldWG();
     if (!wg || !wg->IsWarTime())
     {
-        ResetBattleState();
+        ResetCannonState();
         return false;
     }
     if (bot->isDead())
     {
-        ResetBattleState();
+        ResetCannonState();
         return false;
     }
     if (bot->GetTeamId() != wg->GetDefenderTeam())

@@ -41,8 +41,12 @@ public:
     // Used by combat target value filters to suppress combat for workshop capture bots.
     static bool IsCapturingWorkshop(Player* bot);
 
-private:
+    // Resets all per-bot battle states.
+    // Public because BfStrategyCheckAction must call it when it deactivates the strategy at end of battle.
     void ResetBattleState();
+
+private:
+    void ClearSharedTracking();
     bool FollowWgRoute(Position const& objective, bool checkPathBlock);
     bool TryCaptureWorkshop(BattlefieldWG* wg);
 
@@ -78,7 +82,7 @@ public:
     bool Execute(Event event) override;
 
 private:
-    void ResetBattleState();
+    void ResetCannonState();
 
     ObjectGuid m_targetCannon;
     uint32     m_cannonScanTime = 0;

@@ -8,6 +8,7 @@
 #include "AreaDefines.h"
 #include "Battlefield.h"
 #include "BattlefieldMgr.h"
+#include "BattlefieldTactics.h"
 #include "Event.h"
 #include "Opcodes.h"
 #include "PlayerbotAI.h"
@@ -72,6 +73,11 @@ bool BfStrategyCheckAction::Execute(Event /*event*/)
     }
     if (!inActiveWG && hasWGStrat)
     {
+        // Primary battle reset is done here rather than in BattlefieldTactics, since BfStrategyCheckAction::Execute
+        // outranks WgCheckFlagAction::Execute. The latter Execute is also removed by "-wintergrasp" below.
+        if (Action* action = botAI->GetAiObjectContext()->GetAction("wg check flag"))
+            static_cast<WgCheckFlagAction*>(action)->ResetBattleState();
+
         botAI->ChangeStrategy("-wintergrasp", BOT_STATE_NON_COMBAT);
         botAI->ChangeStrategy("-wintergrasp", BOT_STATE_COMBAT);
         LOG_INFO("playerbots", "Bot {} <{}> deactivates Wintergrasp strategy", bot->GetGUID().ToString(), bot->GetName());
