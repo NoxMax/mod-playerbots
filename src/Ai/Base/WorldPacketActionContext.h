@@ -105,8 +105,6 @@ public:
         creators["bg join"] = &WorldPacketActionContext::bg_join;
         creators["bg leave"] = &WorldPacketActionContext::bg_leave;
         creators["bf strategy check"] = &WorldPacketActionContext::bf_strategy_check;
-        creators["accept bf queue invite"] = &WorldPacketActionContext::accept_bf_queue_invite;
-        creators["accept bf entry invite"] = &WorldPacketActionContext::accept_bf_entry_invite;
         creators["arena tactics"] = &WorldPacketActionContext::arena_tactics;
         creators["petition sign"] = &WorldPacketActionContext::petition_sign;
         creators["lfg join"] = &WorldPacketActionContext::lfg_join;
@@ -174,8 +172,6 @@ private:
     static Action* bg_status_check(PlayerbotAI* botAI) { return new BGStatusCheckAction(botAI); }
     static Action* bg_strategy_check(PlayerbotAI* botAI) { return new BGStrategyCheckAction(botAI); }
     static Action* bf_strategy_check(PlayerbotAI* botAI) { return new BfStrategyCheckAction(botAI); }
-    static Action* accept_bf_queue_invite(PlayerbotAI* botAI) { return new AcceptBfQueueInviteAction(botAI); }
-    static Action* accept_bf_entry_invite(PlayerbotAI* botAI) { return new AcceptBfEntryInviteAction(botAI); }
     static Action* arena_tactics(PlayerbotAI* botAI) { return new ArenaTactics(botAI); }
     static Action* petition_sign(PlayerbotAI* botAI) { return new PetitionSignAction(botAI); }
     static Action* lfg_teleport(PlayerbotAI* botAI) { return new LfgTeleportAction(botAI); }

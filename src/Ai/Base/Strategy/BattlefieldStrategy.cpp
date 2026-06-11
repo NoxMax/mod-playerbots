@@ -11,11 +11,8 @@ BfStrategy::BfStrategy(PlayerbotAI* botAI) : PassTroughStrategy(botAI) {}
 
 void BfStrategy::InitTriggers(std::vector<TriggerNode*>& triggers)
 {
-    // Respond to Wintergrasp enrollment packets as they arrive
-    triggers.push_back(new TriggerNode("wg queue invite", {NextAction("accept bf queue invite", ACTION_EMERGENCY)}));
-    triggers.push_back(new TriggerNode("wg entry invite", {NextAction("accept bf entry invite", ACTION_EMERGENCY)}));
-
     // Every second: a cheap check on whether to activate/deactivate WintergraspStrategy.
+    // This also accepts pending WG queue/entry invites stored by PlayerbotAI::HandleBotOutgoingPacket.
     triggers.push_back(new TriggerNode("timer", {NextAction("bf strategy check", relevance)}));
 
     // Every 60 seconds: guaranteed re-check at ACTION_EMERGENCY, mirroring AV's "timer bg" -> "bg reset objective force".

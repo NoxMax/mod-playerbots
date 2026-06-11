@@ -85,26 +85,3 @@ bool BfStrategyCheckAction::Execute(Event /*event*/)
     }
     return false;
 }
-
-// SMSG_BATTLEFIELD_MGR_QUEUE_INVITE packet layout:
-//   uint32 BattleId
-//   uint8  queuing (1 = queuing for upcoming battle. Hardcoded as 1)
-bool AcceptBfQueueInviteAction::Execute(Event event)
-{
-    WorldPacket p(event.getPacket());
-    uint32 battleId;
-    p >> battleId;
-    return AcceptQueueInvite(bot, battleId);
-}
-
-// SMSG_BATTLEFIELD_MGR_ENTRY_INVITE packet layout:
-//   uint32 BattleId
-//   uint32 ZoneId
-//   uint32 expiry time (game time + accept window)
-bool AcceptBfEntryInviteAction::Execute(Event event)
-{
-    WorldPacket p(event.getPacket());
-    uint32 battleId;
-    p >> battleId;
-    return AcceptEntryInvite(bot, botAI, battleId);
-}

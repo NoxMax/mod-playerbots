@@ -198,8 +198,6 @@ PlayerbotAI::PlayerbotAI(Player* bot)
     botOutgoingPacketHandlers.AddHandler(SMSG_DUEL_REQUESTED, "duel requested");
     botOutgoingPacketHandlers.AddHandler(SMSG_INVENTORY_CHANGE_FAILURE, "inventory change failure");
     botOutgoingPacketHandlers.AddHandler(SMSG_BATTLEFIELD_STATUS, "bg status");
-    botOutgoingPacketHandlers.AddHandler(SMSG_BATTLEFIELD_MGR_QUEUE_INVITE, "wg queue invite");
-    botOutgoingPacketHandlers.AddHandler(SMSG_BATTLEFIELD_MGR_ENTRY_INVITE, "wg entry invite");
     botOutgoingPacketHandlers.AddHandler(SMSG_LFG_ROLE_CHECK_UPDATE, "lfg role check");
     botOutgoingPacketHandlers.AddHandler(SMSG_LFG_PROPOSAL_UPDATE, "lfg proposal");
     botOutgoingPacketHandlers.AddHandler(SMSG_TEXT_EMOTE, "receive text emote");
@@ -1389,8 +1387,9 @@ void PlayerbotAI::HandleBotOutgoingPacket(WorldPacket const& packet)
         }
         case SMSG_BATTLEFIELD_MGR_QUEUE_INVITE:
         {
-            // Store the pending queue invite. BfStrategyCheckAction will process it later,
-            // ensuring acceptance works in combat mode (packet triggers only fire in non-combat).
+            // Handled inline rather than queued to botOutgoingPacketHandlers, ensuring acceptance works
+            // even mid-combat, given there's only 20 second before the invite expires.
+            // BfStrategyCheckAction accepts the stored invite on the bot's next tick, in or out of combat.
             WorldPacket p(packet);
             p.rpos(0);
             p >> pendingWgQueueInviteBattleId;
@@ -1398,8 +1397,8 @@ void PlayerbotAI::HandleBotOutgoingPacket(WorldPacket const& packet)
         }
         case SMSG_BATTLEFIELD_MGR_ENTRY_INVITE:
         {
-            // Store the pending entry invite. BfStrategyCheckAction will process it later,
-            // ensuring acceptance works in combat mode.
+            // Packet layout: uint32 battleId, uint32 zoneId, uint32 expiry time.
+            // Store the pending entry invite; accepted the same way as the queue invite above.
             WorldPacket p(packet);
             p.rpos(0);
             p >> pendingWgEntryInviteBattleId;

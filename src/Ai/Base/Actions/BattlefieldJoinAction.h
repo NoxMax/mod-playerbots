@@ -9,28 +9,12 @@
 #include "Action.h"
 
 // Periodically checks whether to activate/deactivate WintergraspStrategy based on zone + war state.
+// Also accepts pending WG queue/entry invites (stored by PlayerbotAI::HandleBotOutgoingPacket) by
+// responding with CMSG_BATTLEFIELD_MGR_QUEUE_INVITE_RESPONSE / CMSG_BATTLEFIELD_MGR_ENTRY_INVITE_RESPONSE.
 class BfStrategyCheckAction : public Action
 {
 public:
     BfStrategyCheckAction(PlayerbotAI* botAI) : Action(botAI, "bf strategy check") {}
-    bool Execute(Event event) override;
-};
-
-// Responds to SMSG_BATTLEFIELD_MGR_QUEUE_INVITE (sent 15 min before war starts)
-// by accepting the queue invite via CMSG_BATTLEFIELD_MGR_QUEUE_INVITE_RESPONSE
-class AcceptBfQueueInviteAction : public Action
-{
-public:
-    AcceptBfQueueInviteAction(PlayerbotAI* botAI) : Action(botAI, "accept bf queue invite") {}
-    bool Execute(Event event) override;
-};
-
-// Responds to SMSG_BATTLEFIELD_MGR_ENTRY_INVITE (sent when war starts)
-// by accepting the war entry via CMSG_BATTLEFIELD_MGR_ENTRY_INVITE_RESPONSE
-class AcceptBfEntryInviteAction : public Action
-{
-public:
-    AcceptBfEntryInviteAction(PlayerbotAI* botAI) : Action(botAI, "accept bf entry invite") {}
     bool Execute(Event event) override;
 };
 
