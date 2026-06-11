@@ -389,7 +389,9 @@ void RandomPlayerbotMgr::UpdateAIInternal(uint32 /*elapsed*/, bool /*minimal*/)
 
     if (sPlayerbotAIConfig.randomBotJoinBF)
     {
-        if (time(nullptr) > (WgCheckTimer + 30))
+        // Freeing slots for waiting real players must beat PlayersWillBeKick 10s deadline in Battlefield.cpp
+        // The heavier work (inviting bots) only runs every 30s, throttled inside CheckWgQueue.
+        if (time(nullptr) > (WgCheckTimer + 5))
             sRandomPlayerbotMgr.CheckWgQueue();
     }
 
@@ -1289,8 +1291,11 @@ void RandomPlayerbotMgr::CheckWgQueue()
                 break;
             }
         }
-        if (hasRealPlayer)
+        // Invite bots at most every 30s.
+        if (hasRealPlayer && time(nullptr) > (WgInviteTimer + 30))
         {
+            WgInviteTimer = time(nullptr);
+
             uint32 minLevel = sConfigMgr->GetOption<uint32>("Wintergrasp.PlayerMinLvl", 75);
 
             // Collect eligible random bots for Wintergrasp.

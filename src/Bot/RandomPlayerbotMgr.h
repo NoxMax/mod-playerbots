@@ -204,6 +204,7 @@ private:
 
         this->BgCheckTimer = 0;
         this->WgCheckTimer = 0;
+        this->WgInviteTimer = 0;
         this->WgWasWarTime = false;
         this->LfgCheckTimer = 0;
         this->PlayersCheckTimer = 0;
@@ -232,6 +233,7 @@ private:
     std::vector<uint32> GetBgBots(uint32 bracket);
     time_t BgCheckTimer;
     time_t WgCheckTimer;
+    time_t WgInviteTimer;
     bool   WgWasWarTime;
     time_t LfgCheckTimer;
     time_t PlayersCheckTimer;
