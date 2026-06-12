@@ -254,6 +254,7 @@ public:
     bool RandomBotJoinBG;
     bool RandomBotAutoJoinBG;
     uint32 RandomBotJoinBF;
+    bool RandomBotAutoJoinWG;
 
     std::string RandomBotAutoJoinICBrackets;
     std::string RandomBotAutoJoinEYBrackets;

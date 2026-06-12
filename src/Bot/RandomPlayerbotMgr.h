@@ -48,6 +48,7 @@ struct BattlegroundInfo
 class ChatHandler;
 class PerfMonitorOperation;
 class WorldLocation;
+class Battlefield;
 
 struct CachedEvent
 {
@@ -154,6 +155,7 @@ public:
     std::map<TeamId, std::vector<uint32>> LfgDungeons;
     void CheckBgQueue();
     void CheckWgQueue();
+    bool HasRealPlayerInBattlefield(Battlefield* bf);
     void CheckLfgQueue();
     void CheckPlayers();
     void LogBattlegroundInfo();

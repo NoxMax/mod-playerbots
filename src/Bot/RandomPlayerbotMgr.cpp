@@ -1327,19 +1327,13 @@ void RandomPlayerbotMgr::CheckWgQueue()
     // A: Wintergrasp battle has begun!
     if (wartime)
     {
-        // Only invite bots when at least one real player is in the WG zone. Bots that are already in WG will
-        // be invited by the core logic however, and will join the battle if AiPlayerbot.RandomBotJoinBF > 0
-        bool hasRealPlayer = false;
-        for (Player* p : players)
-        {
-            if (p && p->IsInWorld() && p->GetZoneId() == wg->GetZoneId())
-            {
-                hasRealPlayer = true;
-                break;
-            }
-        }
+        // Unless RandomBotAutoJoinWG is enabled, only invite bots once a real player is enrolled in the
+        // battle. Bots that are already in WG get invited by the core, but apply the same gate when
+        // accepting (see BfStrategyCheckAction).
+        bool canInvite = sPlayerbotAIConfig.RandomBotAutoJoinWG || HasRealPlayerInBattlefield(wg);
+
         // Invite bots at most every 30s.
-        if (hasRealPlayer && time(nullptr) > (WgInviteTimer + 30))
+        if (canInvite && time(nullptr) > (WgInviteTimer + 30))
         {
             WgInviteTimer = time(nullptr);
 
@@ -1371,7 +1365,7 @@ void RandomPlayerbotMgr::CheckWgQueue()
 
                 // Skip bots with a real player master or have a real player in their group.
                 PlayerbotAI* botAI = GET_PLAYERBOT_AI(bot);
-                if (botAI && botAI->HasRealPlayerMaster())
+                if (botAI && botAI->HasGameClientMaster())
                     continue;
                 if (Group* group = bot->GetGroup())
                 {
@@ -1486,6 +1480,17 @@ void RandomPlayerbotMgr::CheckWgQueue()
 
     // Stores if Wintergrasp was on war time in the previous tick.
     WgWasWarTime = wartime;
+}
+
+// Returns true if any real player is enrolled as a participant in the Wintergrasp battle.
+// Checks against IsPlayerInBattlefield, not InBattlefield. Inclusive of all, including GMs.
+bool RandomPlayerbotMgr::HasRealPlayerInBattlefield(Battlefield* bf)
+{
+    for (Player* player : players)
+        if (player && player->IsInWorld() && bf->IsPlayerInBattlefield(player->GetGUID()))
+            return true;
+
+    return false;
 }
 
 void RandomPlayerbotMgr::CheckLfgQueue()
