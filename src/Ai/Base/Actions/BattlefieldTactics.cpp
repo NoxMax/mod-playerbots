@@ -29,16 +29,17 @@
 #include <queue>
 #include <unordered_set>
 
-// NPC entries for vehicle engineers at Wintergrasp workshops (from zone_wintergrasp.cpp)
-static constexpr uint32 NPC_WG_GOBLIN_MECHANIC  = 30400;  // Horde workshop engineer
-static constexpr uint32 NPC_WG_GNOMISH_ENGINEER = 30499;  // Alliance workshop engineer
+// NPC and spell entries from zone_wintergrasp.cpp
+static constexpr uint32 NPC_WG_GOBLIN_MECHANIC  = 30400;    // Horde workshop engineer
+static constexpr uint32 NPC_WG_GNOMISH_ENGINEER = 30499;    // Alliance workshop engineer
+static constexpr uint32 SPELL_VEHICLE_TELEPORT  = 49759;    // Aura applied by the fortress vehicle teleporter
 
 // Snap radius: match a cannon creature to a known WG_DEFENDER_CANNON_POSITIONS entry
 static constexpr float  WG_CANNON_SEARCH_RADIUS        = 5.0f;
 // Base interval (ms) between WgMountTowerCannonAction scans, multiplied by level stagger
 static constexpr uint32 WG_SCAN_INTERVAL               = 15000;
 // Distance to Central Wall. Ensures defenders won't scan for cannons when they are far from the wall
-static constexpr float  WG_CANNON_CENTRAL_WALL_RANGE   = 100.0f;
+static constexpr float  WG_CANNON_CENTRAL_WALL_RANGE   = 120.0f;
 // If a defender scans for a cannon, it will only scan within this range of itself
 static constexpr float  WG_OBJ_SCAN_RANGE              = 200.0f;
 // Distance at which FollowWgRoute advances to the next A* waypoint (halved for vehicles)
@@ -63,15 +64,16 @@ static constexpr float  WG_TOWER_MELEE_DIST            = 35.0f;
 // Distance to fortress teleporters used to detect which workshop a defender vehicle came from
 static constexpr float  FORTRESS_WS_DETECT_DIST        = 100.0f;
 // FindNearestCreature range for locating the workshop engineer NPC to summon a vehicle
-static constexpr float  ENGINEER_SCAN_RANGE            = 8.0f;
+static constexpr float  ENGINEER_SCAN_RANGE            = 12.0f;
 
 // ######################## //
 // Wintergrasp Path Network
 // ######################## //
 
-    // { Xf, Yf, Zf, #, bool}
-    // XYZ coordinates with # world state value of blocker to destroy, and bool for unskippable waypoints.
-    // World state values imported from the core at BattlefieldWG.h
+// { Xf, Yf, Zf, #, bool}
+// XYZ coordinates with # world state value of blocker to destroy, and bool for unskippable waypoints.
+// World state values imported from the core at BattlefieldWG.h
+
 // Ring Road North: The upper half of the Wintergrasp ring road
 static WgPath const vPath_WG_Ring_Road_North = {
     { 4784.530f, 3291.680f, 365.614f },	         // Western connection to Ring Road South
@@ -392,12 +394,16 @@ static WgWorkshopData const WG_WORKSHOPS[] = {
 // A* Waypoint Graph
 // ################# //
 
+// Path blocking mechanics:
+// Node block (WgNode::pathBlock): building stands AT the waypoint. Vehicles hold and attack it, but infantry pass.
+// Edge block (WgEdge::blockWorldState): passage BETWEEN waypoints (junctions) is sealed for everyone until destroyed.
+// Solid barriers use both, meanwhile blockers with infantry gaps use only the node block.
 struct WgEdge { uint32 target; uint32 blockWorldState = 0; };
 
 struct WgNode
 {
     float    x, y, z;
-    uint32   pathBlock;     // WorldState ID of the building blocking this node (0 = none)
+    uint32   pathBlock;     // WorldState ID of the building standing at this node (0 = none)
     bool     noSkip;        // true = next waypoint skipping logic is limited
     bool     noVehicle;     // true = A* skips this node when routing vehicles
     std::vector<WgEdge> adj;
@@ -456,8 +462,8 @@ static constexpr uint32 WG_WS_TOWER_SW       = 3704;  // Entry 190356 - SW Tower
 
 // Cross-path junction edges connecting waypoints across different paths.
 // oneWay=true: only the A->B edge is added (pathA is the source direction).
-// blockWorldState!=0: the edge is impassable for infantry A* until the building with that WorldState ID is destroyed;
-// vehicles always ignore this check, so they may approach the blocker to destroy it.
+// blockWorldState!=0: the edge is impassable to all until the wall with that WorldState ID is destroyed. Vehicles
+// can still approach (without crossing) a standing blocker, as their attack objective is the wall node itself.
 struct WgJunctionDef { uint8 pathA, wpA, pathB, wpB; bool oneWay = false; uint32 blockWorldState = 0; };
 static WgJunctionDef const WG_JUNCTIONS[] = {
     // Bi-directional junctions:
@@ -607,7 +613,7 @@ static std::atomic<int32_t> s_WgFortGuardAtGate{0};             // Counter for d
 static std::atomic<int32_t> s_WgFortGuardAtOtherSide{0};        // Counter for defender vehicles assigned to hisGuardAtOtherSide, which is the
                                                                     // side opposing hisGuardAtStage.
 static constexpr uint32 GUARD_REBALANCE_PERIOD      = 10000u;   // Period to re-evaluate fort guard positions.
-static std::mutex           s_WgFortGuardPosMtx;                // Sequences Stage/Gate assignment to prevent races on attack tower destruction.
+static std::mutex           s_WgFortGuardPosMtx;                // Sequences fort guard slot claims and Stage/Gate assignment.
 static constexpr uint8  MAX_TOWER_SQUAD             = 3;        // Max defender vehicles assigned to attack any single tower.
 static std::atomic<int32_t> s_WgTowerSquad[3]{};                // Per-tower squad counters, indexed by DEF_TOWERS[].
 static std::mutex           s_WgTowerSquadMtx;                  // Sequences tower squad assignment to prevent races on tower reassignments.
@@ -952,18 +958,19 @@ void WgCheckFlagAction::ResetBattleState()
     m_arrivedAtCapture = false;
 }
 
-// Routes a percentage of infantry bots to capture workshops, latching them on arrival until capture succeeds.
+// Routes a percentage of infantry bots to capture workshops. Once assigned, a bot is committed to its target workshop
+// until its team captures it, its death, or end of battle. The capture force size adapts to how many workshops the team
+// owns, but only when handing out new assignments.
 bool WgCheckFlagAction::TryCaptureWorkshop(BattlefieldWG* wg)
 {
     TeamId team = bot->GetTeamId();
 
-    // If already committed to a workshop (arrived and latch set), stay there regardless of what capturePct is doing.
-    // Capturing elsewhere doesn't release this bot. Only exit if the team captures this workshop.
-    if (m_arrivedAtCapture)
+    // Assigned (en route or arrived).
+    if (m_captureWsIdx != 0xFF)
     {
+        // The team captured the target: release. A fresh roll may hand out a new assignment next tick.
         if (wg->GetWorkshopTeam(WG_WORKSHOPS[m_captureWsIdx].workshopId) == team)
         {
-            // Capture succeeded: release.
             m_captureWsIdx     = 0xFF;
             m_arrivedAtCapture = false;
             std::lock_guard<std::mutex> lock(s_WgCapturingWorkshopMtx);
@@ -971,61 +978,62 @@ bool WgCheckFlagAction::TryCaptureWorkshop(BattlefieldWG* wg)
             return false;
         }
 
-        // Combat Yielding: Check for both active combat and nearby enemy presence.
-        // IsCapturingWorkshop is cleared on arrival, so "enemy player target" can find targets. This makes sure bots
-        // would engage hostiles around the workshop, while they are trying to capture it.
-        Unit* enemyTarget = AI_VALUE(Unit*, "enemy player target");
-        if (bot->IsInCombat() || enemyTarget)
-            return false;
+        if (m_arrivedAtCapture)
+        {
+            // Combat Yielding: Check for both active combat and nearby enemy presence.
+            // IsCapturingWorkshop is cleared on arrival, so "enemy player target" can find targets. This makes sure bots
+            // would engage hostiles around the workshop, while they are trying to capture it.
+            Unit* enemyTarget = AI_VALUE(Unit*, "enemy player target");
+            if (bot->IsInCombat() || enemyTarget)
+                return false;
 
-        // Not fighting: navigate back if displaced. Block lower-priority routing.
-        WgPath const& wsPath = *WG_WORKSHOPS[m_captureWsIdx].path;
-        Position const pos(wsPath[0].x, wsPath[0].y, wsPath[0].z, 0.0f);
-        FollowWgRoute(pos, false);
-        return true;
+            // Not fighting: navigate back if displaced. Block lower-priority routing.
+            WgPath const& wsPath = *WG_WORKSHOPS[m_captureWsIdx].path;
+            Position const pos(wsPath[0].x, wsPath[0].y, wsPath[0].z, 0.0f);
+            FollowWgRoute(pos, false);
+            return true;
+        }
     }
-
-    uint8 ownedCount = WgCountCapturedWorkshops(wg, team);
-    uint8 capturePct = 0;
-    if (ownedCount < 2)
-        capturePct = WG_CAPTURE_PCT_HIGH;
-    else if (ownedCount == 2)
-        capturePct = WG_CAPTURE_PCT_MID;
-    else if (ownedCount == 3)
-        capturePct = WG_CAPTURE_PCT_LOW;
-
-    // Add capture percentage modifier, depending on faction, and faction role as attacker/defender.
-    bool isAttacker = (team != wg->GetDefenderTeam());
-    if (team == TEAM_ALLIANCE)
-        capturePct += isAttacker ? WG_CAP_MOD_ALLIANCE_ATK : WG_CAP_MOD_ALLIANCE_DEF;
     else
-        capturePct += isAttacker ? WG_CAP_MOD_HORDE_ATK : WG_CAP_MOD_HORDE_DEF;
-
-    // Not assigned to capture: release and let main routing handle things.
-    if (capturePct == 0 ||
-        static_cast<uint8>(bot->GetGUID().GetCounter() % 100) >= capturePct)
     {
-        m_captureWsIdx = 0xFF;
-        std::lock_guard<std::mutex> lock(s_WgCapturingWorkshopMtx);
-        s_WgCapturingWorkshop.erase(m_botGuidRaw);
-        return false;
-    }
+        uint8 ownedCount = WgCountCapturedWorkshops(wg, team);
+        uint8 capturePct = 0;
+        if (ownedCount < 2)
+            capturePct = WG_CAPTURE_PCT_HIGH;
+        else if (ownedCount == 2)
+            capturePct = WG_CAPTURE_PCT_MID;
+        else if (ownedCount == 3)
+            capturePct = WG_CAPTURE_PCT_LOW;
 
-    uint8 wsIdx = WgPickCapturableWorkshop(wg, bot, team);
-    if (wsIdx == 0xFF)
-    {
-        m_captureWsIdx = 0xFF;
-        std::lock_guard<std::mutex> lock(s_WgCapturingWorkshopMtx);
-        s_WgCapturingWorkshop.erase(m_botGuidRaw);
-        return false;
-    }
+        // Add capture percentage modifier, depending on faction, and faction role as attacker/defender.
+        bool isAttacker = (team != wg->GetDefenderTeam());
+        if (team == TEAM_ALLIANCE)
+            capturePct += isAttacker ? WG_CAP_MOD_ALLIANCE_ATK : WG_CAP_MOD_ALLIANCE_DEF;
+        else
+            capturePct += isAttacker ? WG_CAP_MOD_HORDE_ATK : WG_CAP_MOD_HORDE_DEF;
 
-    // Update assignment if it changed as a result of a change in number of captured workshops; though a bot
-    // actively capturing a workshop, won't stop until capture or death.
-    if (wsIdx != m_captureWsIdx)
+        // Not rolled into capture duty: let main routing handle this bot.
+        if (capturePct == 0 ||
+            static_cast<uint8>(bot->GetGUID().GetCounter() % 100) >= capturePct)
+        {
+            std::lock_guard<std::mutex> lock(s_WgCapturingWorkshopMtx);
+            s_WgCapturingWorkshop.erase(m_botGuidRaw);
+            return false;
+        }
+
+        uint8 wsIdx = WgPickCapturableWorkshop(wg, bot, team);
+        if (wsIdx == 0xFF)
+        {
+            std::lock_guard<std::mutex> lock(s_WgCapturingWorkshopMtx);
+            s_WgCapturingWorkshop.erase(m_botGuidRaw);
+            return false;
+        }
+
         m_captureWsIdx = wsIdx;
+    }
 
-    WgPath const& wsPath = *WG_WORKSHOPS[wsIdx].path;
+    // Heading to the assigned workshop.
+    WgPath const& wsPath = *WG_WORKSHOPS[m_captureWsIdx].path;
     Position const pos(wsPath[0].x, wsPath[0].y, wsPath[0].z, 0.0f);
 
     // Set the latch when within the workshop combat zone. Here WG_WORKSHOP_ARRIVE_DIST is used instead of the standard
@@ -1050,14 +1058,13 @@ bool WgCheckFlagAction::TryCaptureWorkshop(BattlefieldWG* wg)
     return true;   // Always true: main routing never fires as long as the bot is on a capture assignment.
 }
 
-// Returns true if the bot is currently en route to capture a workshop.
+// Returns true if the bot is currently heading to capture a workshop and should have combat suppressed.
 bool WgCheckFlagAction::IsCapturingWorkshop(Player* bot)
 {
-    if (!bot)
-        return false;
-
-    // Prevents possible stale entry (a bot whose ResetBattleState never ran) from suppressing combat outside Wintergrasp.
-    if (!bot->InBattlefield())
+    // InBattlefield() check prevents possible stale entry (a bot whose ResetBattleState never ran) from suppressing
+    // combat outside Wintergrasp.
+    // Suppression only applies to First Lieutenants. Lower rank bots are allowed combat engagement to reach higher rank.
+    if (!bot || !bot->InBattlefield() || !bot->HasAura(SPELL_LIEUTENANT))
         return false;
 
     std::lock_guard<std::mutex> lock(s_WgCapturingWorkshopMtx);
@@ -1522,20 +1529,25 @@ bool WgCheckFlagAction::Execute(Event /*event*/)
         {
             // Decision: detect if vehicle came from a fortress workshop (needs teleporter detour).
             // This is legacy code from when defender bots would get vehicles from inside or outside the fortress, depending on
-            // the state of attack towers and whenTheWallsFell. Now however, defenders always get vehicles from the fortess to
-            // streamline everything. The workshop detection logic is kept for now though.
+            // the state of attack towers and whenTheWallsFell. It might be reused in more complex tactics. Now however, defenders
+            // always get vehicles from the fortess to streamline everything. The workshop detection logic is kept for now though.
             case 0:
             {
                 // Assign fort guard role: reset any previous assignment then claim a slot if one is available.
-                if (m_isFortGuard)
                 {
-                    m_isFortGuard = false;
-                    --s_WgFortGuardVehicles;
-                }
-                if (s_WgFortGuardVehicles < VEHICLE_FORT_GUARD)
-                {
-                    m_isFortGuard = true;
-                    ++s_WgFortGuardVehicles;
+                    // Locked so the concurrent sequence (check then claim) can't overshoot VEHICLE_FORT_GUARD, when multiple
+                    // drivers deciding at once.
+                    std::lock_guard<std::mutex> lock(s_WgFortGuardPosMtx);
+                    if (m_isFortGuard)
+                    {
+                        m_isFortGuard = false;
+                        --s_WgFortGuardVehicles;
+                    }
+                    if (s_WgFortGuardVehicles < VEHICLE_FORT_GUARD)
+                    {
+                        m_isFortGuard = true;
+                        ++s_WgFortGuardVehicles;
+                    }
                 }
 
                 // Use teleporter proximity to detect which fortress workshop the vehicle came from, rather than m_workshopIdx,
@@ -1562,11 +1574,10 @@ bool WgCheckFlagAction::Execute(Event /*event*/)
             }
             case 1:     // Teleporter: navigate to the fortress vehicle teleporter
             {
-                // Spell 49759 "Teleport" aura is applied by the vehicle teleporter GO when the vehicle drives over it.
                 Vehicle* veh = bot->GetVehicle();
                 Unit* vBase = veh ? veh->GetBase() : nullptr;
                 // Mirab, his sails unfurled: Vehicle has passed through the teleporter and launched outside.
-                bool hisSailsUnfurled = vBase && vBase->HasAura(49759);
+                bool hisSailsUnfurled = vBase && vBase->HasAura(SPELL_VEHICLE_TELEPORT);
                 if (hisSailsUnfurled)
                 {
                     m_defVehiclePhase = m_isFortGuard ? 4 : 2;  // Fort guards skip towers. Others proceed to tower targeting.
@@ -1968,6 +1979,11 @@ bool WgCheckFlagAction::Execute(Event /*event*/)
 // Summons a vehicle by interacting with the workshop engineer: Siege engines for attackers, demolishers for defenders.
 bool WgSummonVehicleAction::Execute(Event /*event*/)
 {
+    // Check that WG is in wartime.
+    BattlefieldWG* wg = GetBattlefieldWG();
+    if (!wg || !wg->IsWarTime())
+        return false;
+
     // Must have First Lieutenant rank to summon a Demolisher.
     if (!bot->HasAura(SPELL_LIEUTENANT))
         return false;
@@ -1976,12 +1992,8 @@ bool WgSummonVehicleAction::Execute(Event /*event*/)
     if (bot->GetVehicle())
         return false;
 
-    // Check that WG is in wartime.
-    BattlefieldWG* wg = GetBattlefieldWG();
-    if (!wg || !wg->IsWarTime())
-        return false;
-
     TeamId team = bot->GetTeamId();
+    bool isAttacker = (team != wg->GetDefenderTeam());
     uint32 dataVeh = (team == TEAM_HORDE) ? BATTLEFIELD_WG_DATA_VEHICLE_H : BATTLEFIELD_WG_DATA_VEHICLE_A;
     uint32 dataMax = (team == TEAM_HORDE) ? BATTLEFIELD_WG_DATA_MAX_VEHICLE_H : BATTLEFIELD_WG_DATA_MAX_VEHICLE_A;
     if (wg->GetData(dataVeh) >= wg->GetData(dataMax))
@@ -1993,6 +2005,20 @@ bool WgSummonVehicleAction::Execute(Event /*event*/)
     Creature* engineer = bot->FindNearestCreature(engineerEntry, ENGINEER_SCAN_RANGE, true);
     if (!engineer)
         return false;
+
+    // Defenders may only summon at a fortress workshop (WG_WORKSHOPS indices 4 and 5). The defender vehicle phase
+    // system assumes a fortress-teleporter launch, so reject summoning at an outer workshop a defender happens to
+    // stand near. ENGINEER_SCAN_RANGE here doubles as the fortress-waypoint match tolerance.
+    if (!isAttacker)
+    {
+        WgPath const& wsWest = *WG_WORKSHOPS[4].path;
+        WgPath const& wsEast = *WG_WORKSHOPS[5].path;
+        bool atFortressWorkshop =
+            engineer->GetDistance(wsWest[0].x, wsWest[0].y, wsWest[0].z) < ENGINEER_SCAN_RANGE ||
+            engineer->GetDistance(wsEast[0].x, wsEast[0].y, wsEast[0].z) < ENGINEER_SCAN_RANGE;
+        if (!atFortressWorkshop)
+            return false;
+    }
 
     if (bot->GetDistance(engineer) > INTERACTION_DISTANCE)
         return MoveTo(engineer);
@@ -2020,7 +2046,6 @@ bool WgSummonVehicleAction::Execute(Event /*event*/)
     //   slot 1 = Demolisher
     //   slot 2 = Siege Engine
     // Attackers use siege engines to breach walls. Defenders use demolishers.
-    bool isAttacker = (bot->GetTeamId() != wg->GetDefenderTeam());
     uint32 slot = isAttacker ? 2 : 1;
 
     if (!menu.GetItem(slot))
