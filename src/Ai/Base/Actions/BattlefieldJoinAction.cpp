@@ -42,7 +42,11 @@ static bool AcceptEntryInvite(Player* bot, PlayerbotAI* botAI, uint32 battleId)
 
 bool BfStrategyCheckAction::Execute(Event /*event*/)
 {
-    bool inActiveWG = bot->InBattlefield();
+    // Bots need to be in the zone during war time (InBattlefield) and enrolled in the battle (IsPlayerInBattlefield)
+    // to activate their strategy. InBattlefield() checks the same GetBattlefieldToZoneId lookup in the same tick,
+    // so it returning true guarantees getBfZone is non-null.
+    Battlefield* getBfZone = sBattlefieldMgr->GetBattlefieldToZoneId(bot->GetZoneId());
+    bool inActiveWG = bot->InBattlefield() && getBfZone->IsPlayerInBattlefield(bot->GetGUID());
 
     // Process pending WG invites (stored when packets arrived, processed here to work in combat mode)
     if (botAI->pendingWgQueueInviteBattleId)
@@ -55,8 +59,17 @@ bool BfStrategyCheckAction::Execute(Event /*event*/)
     if (botAI->pendingWgEntryInviteBattleId)
     {
         uint32 battleId = botAI->pendingWgEntryInviteBattleId;
-        botAI->pendingWgEntryInviteBattleId = 0;
-        return AcceptEntryInvite(bot, botAI, battleId);
+
+        Battlefield* bf = sBattlefieldMgr->GetBattlefieldByBattleId(battleId);
+        if (!bf || !bf->IsWarTime())
+            botAI->pendingWgEntryInviteBattleId = 0;    // Stale invite from a battle that already ended.
+        else if (sPlayerbotAIConfig.randomBotAutoJoinWG || sRandomPlayerbotMgr.HasRealPlayerInBattlefield(bf))
+        {
+            botAI->pendingWgEntryInviteBattleId = 0;
+            return AcceptEntryInvite(bot, botAI, battleId);
+        }
+        // Otherwise hold the invite and re-check next tick. A real player present at battle start typically enrolls
+        // within seconds. If nobody enrolls, the core expires the invite (~20s) and kicks in-zone bots out of WG.
     }
 
     // Check if strategy is active in either combat or non-combat state
