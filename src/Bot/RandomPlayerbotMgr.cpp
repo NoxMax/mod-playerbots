@@ -1392,9 +1392,8 @@ void RandomPlayerbotMgr::CheckWgQueue()
 
             for (Player* bot : eligible)
             {
-                TeamId team = bot->GetTeamId();
-                uint32 botCap = (sPlayerbotAIConfig.RandomBotJoinBF * wg->GetMaxPlayersPerTeam() + 99) / 100;
-                if (wg->GetPlayersInWarCount(team) >= botCap)
+                // Fill up to the per-faction cap. HasWarVacancy counts pending invites too.
+                if (!wg->HasWarVacancy(bot->GetTeamId()))
                     continue;
 
                 wg->InvitePlayerToWar(bot);
