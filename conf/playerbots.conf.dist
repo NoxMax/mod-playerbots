@@ -1269,14 +1269,10 @@ AiPlayerbot.RandomBotJoinBG = 1
 # Enable bots auto-joining battlegrounds and arenas on their own, even without real players
 AiPlayerbot.RandomBotAutoJoinBG = 0
 
-# Percentage of randombots for Wintergrasp battle (experimental)
-# Assuming the default value of 120 vs 120 in worldserver.conf, a value of 40 here would mean 40% of 120 bots
-# will be invited per faction: 120 * 0.4 * 2 = 96 bots total.
-# If your server can't handle up to 239 bots + you fighting in one place, consider not setting this to 100.
+# Enable Wintergrasp battle for randombots (experimental)
+# When enabled, bots fill the battle up to the Wintergrasp.PlayerMax limit in worldserver.conf (default 120 vs 120).
+# If your server can't handle up to 239 bots + you fighting in one place, consider lowering Wintergrasp.PlayerMax.
 # Or, embrace the chaos. Regardless, bots join only when a real player joins, unless RandomBotAutoJoinWG is enabled.
-#
-#       Default:    0 (disabled)
-#       Range:      0 - 100
 AiPlayerbot.RandomBotJoinBF = 0
 
 # Enable bots auto-joining the Wintergrasp battle on their own, even without real players
