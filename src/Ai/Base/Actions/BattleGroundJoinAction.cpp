@@ -8,6 +8,8 @@
 
 #include "ArenaTeam.h"
 #include "ArenaTeamMgr.h"
+#include "Battlefield.h"
+#include "BattlefieldMgr.h"
 #include "BattlegroundMgr.h"
 #include "Event.h"
 #include "GroupMgr.h"
@@ -108,6 +110,15 @@ bool BGJoinAction::gatherArenaTeam(ArenaType type)
 
             if (member->InBattlegroundQueue())
                 continue;
+
+            // don't queue while in Wintergrasp battle
+            if (member->InBattlefield())
+                continue;
+
+            // don't queue while enrolled for Wintergrasp battle
+            if (Battlefield* bf = sBattlefieldMgr->GetBattlefieldByBattleId(BATTLEFIELD_BATTLEID_WG))
+                if (bf->IsPlayerInBattlefield(member->GetGUID()))
+                    continue;
 
             if (member->GetGroup())
                 member->GetGroup()->RemoveMember(member->GetGUID());
@@ -322,6 +333,15 @@ bool BGJoinAction::isUseful()
     // can't queue while in BG/Arena queue
     if (bot->InBattlegroundQueue())
         return false;
+
+    // don't queue while in Wintergrasp battle
+    if (bot->InBattlefield())
+        return false;
+
+    // don't queue while enrolled for Wintergrasp battle
+    if (Battlefield* bf = sBattlefieldMgr->GetBattlefieldByBattleId(BATTLEFIELD_BATTLEID_WG))
+        if (bf->IsPlayerInBattlefield(bot->GetGUID()))
+            return false;
 
     // do not try right after login (currently not working)
     if ((time(nullptr) - bot->GetInGameTime()) < 120)
