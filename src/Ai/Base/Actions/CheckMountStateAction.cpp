@@ -10,6 +10,8 @@
 #include "BattleGroundTactics.h"
 #include "BattlegroundEY.h"
 #include "BattlegroundWS.h"
+#include "BattlefieldWG.h"
+#include "BattlefieldTactics.h"
 #include "DBCStores.h"
 #include "Event.h"
 #include "PlayerbotAI.h"
@@ -21,6 +23,7 @@
 
 static constexpr uint32 SPELL_COLD_WEATHER_FLYING = 54197;
 static constexpr float PARACHUTE_LAND_THRESHOLD = 15.0f;
+static constexpr float NEARBY_WG_ENGINEER = 12.0f;
 
 // Preferred mounts per bot, loaded once at startup by LoadPreferredMounts()
 std::unordered_map<uint32, PreferredMountCache> CheckMountStateAction::mountCache;
@@ -65,6 +68,17 @@ MountData CollectMountData(Player const* bot)
         data.allSpells[index][speed].push_back(spellId);
     }
     return data;
+}
+
+// Wintergrasp: Stops vehicle eligible bots that are near a workshop engineer from remounting, which can conflict with them
+// summoning a vehicle from the engineer. The initial dismount is done in WgSummonVehicleAction in BattlefieldTactics.cpp
+static bool IsAtWintergraspEngineer(Player* bot)
+{
+    if (!bot->InBattlefield() || bot->HasAura(SPELL_RECRUIT))
+        return false;
+
+    uint32 engineerEntry = (bot->GetTeamId() == TEAM_HORDE) ? NPC_WG_GOBLIN_MECHANIC : NPC_WG_GNOMISH_ENGINEER;
+    return bot->FindNearestCreature(engineerEntry, NEARBY_WG_ENGINEER, true) != nullptr;
 }
 
 bool CheckMountStateAction::Execute(Event /*event*/)
@@ -142,7 +156,7 @@ bool CheckMountStateAction::Execute(Event /*event*/)
 
     // No real master (random bot or SelfBot) OR bot in BG
     if ((noRealMaster || inBattleground) && !bot->IsMounted() &&
-        noAttackers && shouldMount && !bot->IsInCombat())
+        noAttackers && shouldMount && !bot->IsInCombat() && !IsAtWintergraspEngineer(bot))
         return Mount();
 
     if (!bot->IsFlying() && shouldDismount && bot->IsMounted() &&

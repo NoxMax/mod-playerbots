@@ -12,6 +12,11 @@
 
 class BattlefieldWG;
 
+// NPC and spell entries from zone_wintergrasp.cpp
+static constexpr uint32 NPC_WG_GOBLIN_MECHANIC  = 30400;    // Horde workshop engineer
+static constexpr uint32 NPC_WG_GNOMISH_ENGINEER = 30499;    // Alliance workshop engineer
+static constexpr uint32 SPELL_VEHICLE_TELEPORT  = 49759;    // Aura applied by the fortress vehicle teleporter
+
 struct WgWaypoint
 {
     float  x, y, z;
