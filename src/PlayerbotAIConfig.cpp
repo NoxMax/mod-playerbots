@@ -388,6 +388,7 @@ bool PlayerbotAIConfig::Initialize()
 
     RandomBotJoinBF = sConfigMgr->GetOption<bool>("Playerbots.RandomBotJoinBF", false);
     RandomBotAutoJoinWG = sConfigMgr->GetOption<bool>("Playerbots.RandomBotAutoJoinWG", false);
+    MithriaProtocolWG = sConfigMgr->GetOption<bool>("Playerbots.MithriaProtocolWG", false);
 
     RandomBotAutoJoinArenaBracket = sConfigMgr->GetOption<int32>("Playerbots.RandomBotAutoJoinArenaBracket", 14);
 

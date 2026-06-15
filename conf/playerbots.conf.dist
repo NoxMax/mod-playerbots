@@ -2762,3 +2762,5 @@ Playerbots.TargetPosRecalcDistance = 0.1
 
 # Allow bots to be summoned near innkeepers
 Playerbots.SummonAtInnkeepersEnabled = 1
+
+Playerbots.MithriaProtocolWG = 0
