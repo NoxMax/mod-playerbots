@@ -240,6 +240,7 @@ public:
     bool randomBotAutoJoinBG;
     bool randomBotJoinBF;
     bool randomBotAutoJoinWG;
+    bool mithriaProtocolWG;
 
     std::string randomBotAutoJoinICBrackets;
     std::string randomBotAutoJoinEYBrackets;

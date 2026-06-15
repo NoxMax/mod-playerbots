@@ -1399,9 +1399,21 @@ void RandomPlayerbotMgr::CheckWgQueue()
         }
     }
 
-    // C: On war end, teleport random bots in WG to Dalaran
+    // C: On war end, clear random bots out of WG so they resume normal activities.
     if (WgWasWarTime && !wartime)
     {
+        Player* wgTeleportVictim = nullptr;
+        // Mithria suggested all bots are teleported to the real player in the world with the lowest percent health.
+        // Config is disabled by default, and is left without comments in the dist file as an Easter egg.
+        if (sPlayerbotAIConfig.mithriaProtocolWG)
+            for (Player* p : players)   // Real players only.
+            {
+                if (!p || !p->IsInWorld() || !p->IsAlive() || p->GetMap()->Instanceable())
+                    continue;
+                if (!wgTeleportVictim || p->GetHealthPct() < wgTeleportVictim->GetHealthPct())
+                    wgTeleportVictim = p;
+            }
+
         for (auto& [guid, bot] : playerBots)
         {
             if (!bot || !bot->IsInWorld() || !IsRandomBot(bot))
@@ -1414,9 +1426,16 @@ void RandomPlayerbotMgr::CheckWgQueue()
             // invite at the next battle start (HandlePlayerLeaveZone does NOT do this).
             bf->AskToLeaveQueue(bot);
 
-            // Teleport: Dalaran (ID 53140)
-            if (!bot->IsBeingTeleported())
-                bot->TeleportTo(571, 5807.750f, 588.347f, 660.939f, 1.663f);
+            if (bot->IsBeingTeleported())
+                continue;
+
+            if (wgTeleportVictim)
+                bot->TeleportTo(wgTeleportVictim->GetMapId(),
+                                wgTeleportVictim->GetPositionX() + frand(-2.0f, 2.0f),
+                                wgTeleportVictim->GetPositionY() + frand(-2.0f, 2.0f),
+                                wgTeleportVictim->GetPositionZ(), wgTeleportVictim->GetOrientation());
+            else
+                RandomTeleportForLevel(bot);
 
             //TODO: If later decided to teleport bots to their capital cities instead, these are their coordinates:
             // (0, -9003.460f, 870.031f, 29.621f, 5.280f)           // Stormwind
@@ -1427,6 +1446,7 @@ void RandomPlayerbotMgr::CheckWgQueue()
             // (0, 1773.470f, 61.121f, -46.321f, 0.540f)            // Undercity
             // (1, -964.980f, 283.433f, 111.187f, 3.020f)           // Thunder Bluff
             // (530, 9998.490f, -7106.780f, 47.706f, 2.440f)        // Silvermoon City
+            // (571, 5807.750f, 588.347f, 660.939f, 1.663f)         // Dalaran (neutral)
         }
     }
 

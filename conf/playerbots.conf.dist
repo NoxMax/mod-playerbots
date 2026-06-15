@@ -2373,3 +2373,5 @@ AiPlayerbot.TargetPosRecalcDistance = 0.1
 
 # Allow bots to be summoned near innkeepers
 AiPlayerbot.SummonAtInnkeepersEnabled = 1
+
+AiPlayerbot.MithriaProtocolWG = 0
