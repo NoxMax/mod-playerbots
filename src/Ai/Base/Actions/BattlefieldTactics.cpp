@@ -29,11 +29,6 @@
 #include <queue>
 #include <unordered_set>
 
-// NPC and spell entries from zone_wintergrasp.cpp
-static constexpr uint32 NPC_WG_GOBLIN_MECHANIC  = 30400;    // Horde workshop engineer
-static constexpr uint32 NPC_WG_GNOMISH_ENGINEER = 30499;    // Alliance workshop engineer
-static constexpr uint32 SPELL_VEHICLE_TELEPORT  = 49759;    // Aura applied by the fortress vehicle teleporter
-
 // Snap radius: match a cannon creature to a known WG_DEFENDER_CANNON_POSITIONS entry
 static constexpr float  WG_CANNON_SEARCH_RADIUS        = 5.0f;
 // Base interval (ms) between WgMountTowerCannonAction scans, multiplied by level stagger
@@ -2023,10 +2018,12 @@ bool WgSummonVehicleAction::Execute(Event /*event*/)
     if (bot->GetDistance(engineer) > INTERACTION_DISTANCE)
         return MoveTo(engineer);
 
-    // Dismount before interacting. Mount aura removal is synchronous, so the bot falls through to the
-    // gossip in the same tick, rather than yielding and risking a remount/dismount cycle.
+    // Dismount before interacting. Remounting is blocked in CheckMountStateAction.cpp.
     if (bot->IsMounted())
     {
+        if (bot->isMoving())
+            bot->StopMoving();
+
         WorldPacket emptyPacket;
         bot->GetSession()->HandleCancelMountAuraOpcode(emptyPacket);
     }
