@@ -7,7 +7,7 @@
 
 #include "Playerbots.h"
 
-BfStrategy::BfStrategy(PlayerbotAI* botAI) : PassTroughStrategy(botAI) {}
+BfStrategy::BfStrategy(PlayerbotAI* botAI) : PassThroughStrategy(botAI) {}
 
 void BfStrategy::InitTriggers(std::vector<TriggerNode*>& triggers)
 {

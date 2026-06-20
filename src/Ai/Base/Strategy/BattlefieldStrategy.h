@@ -6,12 +6,12 @@
 #ifndef _PLAYERBOT_BATTLEFIELDSTRATEGY_H
 #define _PLAYERBOT_BATTLEFIELDSTRATEGY_H
 
-#include "PassTroughStrategy.h"
+#include "PassThroughStrategy.h"
 #include "Strategy.h"
 
 // Always active WG lifecycle strategy. Accepts queue/entry invites and periodically fires BfStrategyCheckAction
 // to toggle WintergraspStrategy based on war state.
-class BfStrategy : public PassTroughStrategy
+class BfStrategy : public PassThroughStrategy
 {
 public:
     BfStrategy(PlayerbotAI* botAI);
