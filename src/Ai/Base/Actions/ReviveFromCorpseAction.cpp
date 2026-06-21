@@ -317,8 +317,11 @@ bool SpiritHealerAction::Execute(Event /*event*/)
     uint32 dCount = AI_VALUE(uint32, "death count");
     int64 deadTime = time(nullptr) - corpse->GetGhostTime();
 
+    // Wintergrasp: a lot of deaths happen in war. Don't pass a true startZone bool to GetGrave,
+    // which would bypass the nearest WG graveyard and send the bot to one in its starting zone.
     GraveyardStruct const* ClosestGrave =
-        GetGrave(dCount > 10 || deadTime > 15 * MINUTE || AI_VALUE(uint8, "durability") < 10);
+        GetGrave(!bot->InBattlefield() &&
+                 (dCount > 10 || deadTime > 15 * MINUTE || AI_VALUE(uint8, "durability") < 10));
 
     if (bot->GetDistance2d(ClosestGrave->x, ClosestGrave->y) < sPlayerbotAIConfig.sightDistance)
     {

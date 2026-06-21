@@ -60,7 +60,7 @@ bool CheckMailAction::Execute(Event /*event*/)
 
 bool CheckMailAction::isUseful()
 {
-    if (botAI->GetMaster() || !bot->GetMailSize() || bot->InBattleground())
+    if (botAI->GetMaster() || !bot->GetMailSize() || bot->InBattleground() || bot->InBattlefield())
         return false;
 
     return true;

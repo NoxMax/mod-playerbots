@@ -65,8 +65,8 @@ bool PossibleTargetsValue::AcceptUnit(Unit* unit)
             }
         }
 
-        // Skip restrictions in BG/Arena
-        if (bot->InBattleground() || bot->InArena())
+        // Skip restrictions in BG/Arena/Battlefield (Wintergrasp)
+        if (bot->InBattleground() || bot->InArena() || bot->InBattlefield())
             return true;
 
         // Skip restrictions if in duel with this player

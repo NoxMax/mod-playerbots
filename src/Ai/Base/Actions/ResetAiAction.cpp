@@ -52,7 +52,7 @@ bool ResetAiAction::Execute(Event event)
         if (botGroup && (!masterGroup || masterGroup != botGroup))
             botAI->SetMaster(nullptr);
     }
-    if (sRandomPlayerbotMgr.IsRandomBot(bot) && !bot->InBattleground())
+    if (sRandomPlayerbotMgr.IsRandomBot(bot) && !bot->InBattleground() && !bot->InBattlefield())
     {
         if (bot->GetGroup() && (!botAI->GetMaster() || GET_PLAYERBOT_AI(botAI->GetMaster())))
         {

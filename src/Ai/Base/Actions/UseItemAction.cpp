@@ -422,7 +422,7 @@ bool UseHearthStone::Execute(Event event)
     return used;
 }
 
-bool UseHearthStone::isUseful() { return !bot->InBattleground(); }
+bool UseHearthStone::isUseful() { return !bot->InBattleground() && !bot->InBattlefield(); }
 
 bool UseRandomRecipe::Execute(Event /*event*/)
 {

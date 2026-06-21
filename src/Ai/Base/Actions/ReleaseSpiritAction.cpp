@@ -21,7 +21,7 @@ bool ReleaseSpiritAction::Execute(Event event)
 {
     if (bot->IsAlive())
     {
-        if (!bot->InBattleground())
+        if (!bot->InBattleground() && !bot->InBattlefield())
         {
             botAI->TellMasterNoFacing(PlayerbotTextMgr::instance().GetBotTextOrDefault(
                 "release_spirit_not_dead_wait", "I am not dead, will wait here", {}));
@@ -233,7 +233,7 @@ bool RepopAction::Execute(Event /*event*/)
 
 bool RepopAction::isUseful()
 {
-    return !bot->InBattleground();
+    return !bot->InBattleground() && !bot->InBattlefield();
 }
 
 int64 RepopAction::CalculateDeadTime() const

@@ -78,14 +78,14 @@ Unit* GrindTargetValue::FindTargetForGrinding(uint32 assistCount)
         if (abs(bot->GetPositionZ() - unit->GetPositionZ()) > INTERACTION_DISTANCE)
             continue;
 
-        if (!bot->InBattleground() && GetTargetingPlayerCount(unit) > assistCount)
+        if (!bot->InBattleground() && !bot->InBattlefield() && GetTargetingPlayerCount(unit) > assistCount)
             continue;
 
         // if (!bot->InBattleground() && master && master->GetDistance(unit) >= sPlayerbotAIConfig.grindDistance &&
         // !sRandomPlayerbotMgr.IsRandomBot(bot)) continue;
 
         // Bots in bot-groups no have a more limited range to look for grind target
-        if (!bot->InBattleground() && master && botAI->HasStrategy("follow", BotState::BOT_STATE_NON_COMBAT) &&
+        if (!bot->InBattleground() && !bot->InBattlefield() && master && botAI->HasStrategy("follow", BotState::BOT_STATE_NON_COMBAT) &&
             ServerFacade::instance().GetDistance2d(master, unit) > sPlayerbotAIConfig.lootDistance)
         {
             if (botAI->HasStrategy("debug grind", BotState::BOT_STATE_NON_COMBAT))
@@ -93,7 +93,7 @@ Unit* GrindTargetValue::FindTargetForGrinding(uint32 assistCount)
             continue;
         }
 
-        if (!bot->InBattleground() && (int)unit->GetLevel() - (int)bot->GetLevel() > 4 && !unit->GetGUID().IsPlayer())
+        if (!bot->InBattleground() && !bot->InBattlefield() && (int)unit->GetLevel() - (int)bot->GetLevel() > 4 && !unit->GetGUID().IsPlayer())
             continue;
 
         if (Creature* creature = unit->ToCreature())
