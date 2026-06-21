@@ -11,6 +11,7 @@
 #include <vector>
 
 class BattlefieldWG;
+class Creature;
 
 // NPC and spell entries from zone_wintergrasp.cpp
 static constexpr uint32 NPC_WG_GOBLIN_MECHANIC  = 30400;    // Horde workshop engineer
@@ -32,7 +33,7 @@ public:
     WgCheckFlagAction(PlayerbotAI* botAI) : MovementAction(botAI, "wg check flag"),
         m_botGuidRaw(0), m_routeStep(0), m_atkVehiclePhase(0), m_defVehiclePhase(0),
         m_atkGoingToWorkshop(false), m_defGoingToWorkshop(false), m_workshopIdx(0xFF),
-        m_isFortGuard(false), m_defGuardFortress(0), m_defGuardFortressTime(0), m_targetTowerIdx(0xFF),
+        m_defGuardFortress(0), m_defGuardFortressTime(0), m_warScanTime(0), m_targetTowerIdx(0xFF),
         m_isTowerAttacker(false), m_captureWsIdx(0xFF), m_arrivedAtCapture(false)
     {
         // Cached here so the destructor can remove this bot from s_WgCapturingWorkshop.
@@ -42,18 +43,20 @@ public:
     ~WgCheckFlagAction() override;
     bool Execute(Event event) override;
 
-    // Returns true while this bot is actively navigating to capture a workshop.
+    // Public because WgMountTowerCannonAction stages its cannon approach through it.
+    bool FollowWgRoute(Position const& objective, bool checkPathBlock);
+
     // Used by combat target value filters to suppress combat for workshop capture bots.
     static bool IsCapturingWorkshop(Player* bot);
 
-    // Resets all per-bot battle states.
     // Public because BfStrategyCheckAction must call it when it deactivates the strategy at end of battle.
     void ResetBattleState();
 
 private:
     void ClearSharedTracking();
-    bool FollowWgRoute(Position const& objective, bool checkPathBlock);
     bool TryCaptureWorkshop(BattlefieldWG* wg);
+    void FallBackToGuardOrWar(bool whenTheWallsFell);
+    Creature* AcquireWarTarget();
 
     uint64_t            m_botGuidRaw;           // Cached bot GUID for safe use in destructor
     std::vector<uint32> m_route;
@@ -63,9 +66,10 @@ private:
     bool                m_atkGoingToWorkshop;
     bool                m_defGoingToWorkshop;
     uint8               m_workshopIdx;          // Index into WG_WORKSHOPS[]
-    bool                m_isFortGuard;          // True while this bot holds a fort guard vehicle slot
-    uint8               m_defGuardFortress;     // 0=unassigned, 1=hisGuardAtStage, 2=hisGuardAtGate, 3=hisGuardAtOtherSide
+    uint8               m_defGuardFortress;     // 0=unassigned, 1=hisGuardAtWall, 2=hisGuardAtGate, 3=hisGuardAtWar (hunt), 4=hisGuardAtCourt
     uint32              m_defGuardFortressTime; // Timestamp of last guard position assignment evaluation
+    ObjectGuid          m_warTarget;            // hisGuardAtWar: the attacker vehicle this hunter is going after (empty = none)
+    uint32              m_warScanTime;          // hisGuardAtWar: timestamp of last hunt target scan
     uint8               m_targetTowerIdx;       // Index into DEF_TOWERS[]
     bool                m_isTowerAttacker;      // True while this bot holds a tower squad slot
     uint8               m_captureWsIdx;         // Workshop this bot is assigned to capture (0xFF = none)
