@@ -1,12 +1,14 @@
 /*
- * Copyright (C) 2016+ AzerothCore <www.azerothcore.org>, released under GNU AGPL v3 license, you may redistribute it
- * and/or modify it under version 3 of the License, or (at your option), any later version.
+ * This file is part of the mod-playerbots module for AzerothCore. See AUTHORS file for Copyright
+ * information; released under GNU GPL v2 license, redistribute/modify under version 2 of the License,
+ * or (at your option) any later version.
  */
 
 // ######################################################################################################################################### //
 // To future developers: Wintergrasp is a non-linear PVP battle zone that deals with hundreds of bots with constantly changing objectives.
 // Unlike the more linear Battlegrounds, a small change to BattlefieldTactics can have a radical effect on the balance of the match. Make
 // sure you understand what you are changing, what the effects of your changes are, and to thoroughly test your changes.
+// Darmok, few of the named terms have Star Trek references; don't drop them, it would make Kiazi's children cry.
 // ######################################################################################################################################### //
 #include "BattlefieldTactics.h"
 
