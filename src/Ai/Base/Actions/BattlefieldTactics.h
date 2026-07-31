@@ -9,10 +9,15 @@
 
 #include "GenericSpellActions.h"
 #include "MovementActions.h"
+#include "ObjectGuid.h"
+#include <cstdint>
 #include <vector>
 
 class BattlefieldWG;
 class Creature;
+class Player;
+struct Position;
+class Unit;
 
 // NPC and spell entries from zone_wintergrasp.cpp
 static constexpr uint32 NPC_WG_GOBLIN_MECHANIC  = 30400;    // Horde workshop engineer

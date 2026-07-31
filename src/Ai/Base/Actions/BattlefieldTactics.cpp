@@ -10,8 +10,8 @@
 // sure you understand what you are changing, what the effects of your changes are, and to thoroughly test your changes.
 // Darmok, few of the named terms have Star Trek references; don't drop them, it would make Kiazi's children cry.
 // ######################################################################################################################################### //
-#include "BattlefieldTactics.h"
 
+#include "BattlefieldTactics.h"
 #include "Battlefield.h"
 #include "BattlefieldMgr.h"
 #include "BattlefieldWG.h"
@@ -24,12 +24,11 @@
 #include "PositionValue.h"
 #include "Vehicle.h"
 #include "WorldPacket.h"
-
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <functional>
 #include <limits>
-#include <atomic>
 #include <mutex>
 #include <queue>
 #include <unordered_map>

@@ -6,6 +6,8 @@
 
 #include "PlayerbotAI.h"
 #include "AiFactory.h"
+#include "Battlefield.h"
+#include "BattlefieldMgr.h"
 #include "BudgetValues.h"
 #include "ChannelMgr.h"
 #include "CharacterPackets.h"
@@ -54,8 +56,6 @@
 #include "Transport.h"
 #include "Unit.h"
 #include "UpdateTime.h"
-#include "Battlefield.h"
-#include "BattlefieldMgr.h"
 #include "Vehicle.h"
 #include <cmath>
 #include <mutex>

@@ -5,7 +5,6 @@
  */
 
 #include "BattlefieldStrategy.h"
-
 #include "Playerbots.h"
 
 BfStrategy::BfStrategy(PlayerbotAI* botAI) : PassThroughStrategy(botAI) {}
