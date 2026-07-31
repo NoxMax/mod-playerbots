@@ -6,8 +6,8 @@
 
 #include "VehicleActions.h"
 
-#include "BattlegroundIC.h"
 #include "BattlefieldWG.h"
+#include "BattlegroundIC.h"
 #include "ItemVisitors.h"
 #include "ObjectDefines.h"
 #include "Playerbots.h"

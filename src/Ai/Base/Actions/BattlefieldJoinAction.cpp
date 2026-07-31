@@ -5,7 +5,6 @@
  */
 
 #include "BattlefieldJoinAction.h"
-
 #include "AreaDefines.h"
 #include "Battlefield.h"
 #include "BattlefieldMgr.h"

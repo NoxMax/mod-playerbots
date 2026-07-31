@@ -9,8 +9,8 @@
 
 #include "AggressiveStrategy.h"
 #include "AttackEnemyPlayersStrategy.h"
-#include "BattlegroundStrategy.h"
 #include "BattlefieldStrategy.h"
+#include "BattlegroundStrategy.h"
 #include "CastTimeStrategy.h"
 #include "ChatCommandHandlerStrategy.h"
 #include "ConserveManaStrategy.h"

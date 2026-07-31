@@ -6,15 +6,15 @@
 
 #include "AttackersValue.h"
 
-#include "BattlefieldWG.h"
 #include "BattlefieldTactics.h"
+#include "BattlefieldWG.h"
 #include "CellImpl.h"
-#include "Vehicle.h"
 #include "GridNotifiers.h"
 #include "GridNotifiersImpl.h"
 #include "Playerbots.h"
 #include "ReputationMgr.h"
 #include "ServerFacade.h"
+#include "Vehicle.h"
 
 GuidVector AttackersValue::Calculate()
 {

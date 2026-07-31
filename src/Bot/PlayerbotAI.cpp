@@ -11,6 +11,8 @@
 #include <string>
 
 #include "AiFactory.h"
+#include "Battlefield.h"
+#include "BattlefieldMgr.h"
 #include "BudgetValues.h"
 #include "ChannelMgr.h"
 #include "CharacterPackets.h"
@@ -56,8 +58,6 @@
 #include "Transport.h"
 #include "Unit.h"
 #include "UpdateTime.h"
-#include "Battlefield.h"
-#include "BattlefieldMgr.h"
 #include "Vehicle.h"
 
 constexpr uint32 SPELL_TITAN_GRIP = 49152;
