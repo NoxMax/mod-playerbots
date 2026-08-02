@@ -24,15 +24,6 @@ static constexpr uint32 NPC_WG_GOBLIN_MECHANIC  = 30400;    // Horde workshop en
 static constexpr uint32 NPC_WG_GNOMISH_ENGINEER = 30499;    // Alliance workshop engineer
 static constexpr uint32 SPELL_VEHICLE_TELEPORT  = 49759;    // Aura applied by the fortress vehicle teleporter
 
-struct WgWaypoint
-{
-    float  x, y, z;
-    uint32 pathBlock = 0;       // WorldState ID of the building blocking this waypoint (0 = none)
-    bool   noSkip    = false;   // true = bot must reach this node before advancing past it
-};
-
-using WgPath = std::vector<WgWaypoint>;
-
 class WgCheckFlagAction : public MovementAction
 {
 public:
@@ -42,7 +33,7 @@ public:
         m_defGuardFortress(0), m_defGuardFortressTime(0), m_warScanTime(0), m_targetTowerIdx(0xFF),
         m_isTowerAttacker(false), m_captureWsIdx(0xFF), m_arrivedAtCapture(false)
     {
-        // Cached here so the destructor can remove this bot from s_WgCapturingWorkshop.
+        // Cached here so the destructor can remove this bot from s_CapturingWorkshop.
         // Bot may no longer be valid when the destructor runs.
         if (bot) m_botGuidRaw = bot->GetGUID().GetRawValue();
     }
@@ -50,7 +41,7 @@ public:
     bool Execute(Event event) override;
 
     // Public because WgMountTowerCannonAction stages its cannon approach through it.
-    bool FollowWgRoute(Position const& objective, bool checkPathBlock);
+    bool FollowRoute(Position const& objective, bool checkPathBlock);
 
     // Used by combat target value filters to suppress combat for workshop capture bots.
     static bool IsCapturingWorkshop(Player* bot);
@@ -71,7 +62,7 @@ private:
     uint8               m_defVehiclePhase;
     bool                m_atkGoingToWorkshop;
     bool                m_defGoingToWorkshop;
-    uint8               m_workshopIdx;          // Index into WG_WORKSHOPS[]
+    uint8               m_workshopIdx;          // Index into Wg::WORKSHOPS[]
     uint8               m_defGuardFortress;     // 0=unassigned, 1=hisGuardAtWall, 2=hisGuardAtGate, 3=hisGuardAtWar (hunt), 4=hisGuardAtCourt
     uint32              m_defGuardFortressTime; // Timestamp of last guard position assignment evaluation
     ObjectGuid          m_warTarget;            // hisGuardAtWar: the attacker vehicle this hunter is going after (empty = none)

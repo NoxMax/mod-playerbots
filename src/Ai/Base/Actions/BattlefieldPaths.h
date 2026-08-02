@@ -7,9 +7,21 @@
 #ifndef _PLAYERBOT_BATTLEFIELDPATHS_H
 #define _PLAYERBOT_BATTLEFIELDPATHS_H
 
-#include "BattlefieldTactics.h"   // WgWaypoint, WgPath
-#include "BattlefieldWG.h"        // BATTLEFIELD_WG_WORKSHOP_*, SPELL_RECRUIT
+#include "BattlefieldWG.h"
+#include "Position.h"
 #include <vector>
+
+namespace Wg
+{
+
+struct Waypoint
+{
+    float  x, y, z;
+    uint32 pathBlock = 0;       // WorldState ID of the building blocking this waypoint (0 = none).
+    bool   noSkip    = false;   // True = bot must reach this node before advancing past it.
+};
+
+using Path = std::vector<Waypoint>;
 
 // ######################## //
 // Wintergrasp Path Network
@@ -20,7 +32,7 @@
 // World state values imported from the core at BattlefieldWG.h
 
 // Ring Road North: The upper half of the Wintergrasp ring road
-static WgPath const vPath_WG_Ring_Road_North = {
+static Path const vPath_Ring_Road_North = {
     { 4784.530f, 3291.680f, 365.614f },	         // Western connection to Ring Road South
     { 4879.030f, 3331.760f, 372.128f },
     { 4936.400f, 3333.610f, 376.881f },	         // Connection to NW Workshop
@@ -45,7 +57,7 @@ static WgPath const vPath_WG_Ring_Road_North = {
 };
 
 // Ring Road South: The lower half of the Wintergrasp ring road
-static WgPath const vPath_WG_Ring_Road_South = {
+static Path const vPath_Ring_Road_South = {
 	{ 4607.540f, 2366.920f, 379.028f },	         // Eastern connection to Ring Road North
 	{ 4515.940f, 2327.430f, 369.028f },	         // Connections to SE Workshop and SE Tower Road
 	{ 4468.230f, 2365.330f, 359.855f },
@@ -70,7 +82,7 @@ static WgPath const vPath_WG_Ring_Road_South = {
 };
 
 // Central Road: The road that split the ring road from north to south
-static WgPath const vPath_WG_Central_Road = {
+static Path const vPath_Central_Road = {
 	{ 4975.560f, 2870.710f, 385.570f },	         // Connection to Ring Road North
 	{ 4896.410f, 2887.980f, 379.237f },
 	{ 4801.270f, 2892.340f, 373.895f },
@@ -79,7 +91,7 @@ static WgPath const vPath_WG_Central_Road = {
 };
 
 // Alliance Route: From Alliance spawn, to the NE graveyard, to the eastern wall of the fortress
-static WgPath const vPath_WG_Alliance_Route = {
+static Path const vPath_Alliance_Route = {
 
     { 5067.980f, 2203.720f, 356.622f },			 // Alliance Spawn
     { 5059.815f, 2261.002f, 356.533f },
@@ -93,7 +105,7 @@ static WgPath const vPath_WG_Alliance_Route = {
 };
 
 // Auxiliary path: For navigation form the NE graveyard, towards Ring Road North, then remerge Alliance Route
-static WgPath const vPath_WG_Alliance_Bypath = {
+static Path const vPath_Alliance_Bypath = {
 	{ 5048.789f, 2350.387f, 360.484f },          // First connection to Alliance Route
 	{ 5048.169f, 2429.670f, 360.649f },
 	{ 5046.729f, 2511.246f, 356.988f },          // Connection to Ring Road North
@@ -101,12 +113,12 @@ static WgPath const vPath_WG_Alliance_Bypath = {
 };
 
 // Auxiliary path: Providing a second connection point between Ring Road North and Horde Route B
-static WgPath const vPath_WG_Horde_Bypath = {
+static Path const vPath_Horde_Bypath = {
     { 5087.630f, 3105.240f, 363.656f },          // Connections Ring Road North (6) and Horde Route B (1)
 };
 
 // Horde Route A: From Horde spawn spawn, to the NW graveyard, and into Ring Road North near NW Workshop
-static WgPath const vPath_WG_Horde_Route_Part_A = {
+static Path const vPath_Horde_Route_Part_A = {
 	{ 5005.520f, 3644.310f, 360.585f },	         // Horde Spawn and connection to Far SW Path
 	{ 5026.290f, 3584.060f, 356.285f },
 	{ 4997.950f, 3516.910f, 356.520f },
@@ -115,7 +127,7 @@ static WgPath const vPath_WG_Horde_Route_Part_A = {
 };
 
 // Horde Route B: From the NW side of Ring Road North near NW Workshop, to the western wall of the fortress
-static WgPath const vPath_WG_Horde_Route_Part_B = {
+static Path const vPath_Horde_Route_Part_B = {
 	{ 5097.330f, 3153.350f, 360.052f },		     // Connection to Ring Road North
 	{ 5152.640f, 3074.960f, 380.069f },          // Connections to Horde Bypath and Far NW Path
 	{ 5198.530f, 3000.700f, 404.440f },          // Connections to Vehicle Teleporter Exit West, Fortress Bypath West (1), and NW Exit Path
@@ -123,7 +135,7 @@ static WgPath const vPath_WG_Horde_Route_Part_B = {
 };
 
 // Defenders Route: From the fortress graveyard down to Fortress Central Court
-static WgPath const vPath_WG_Defenders_Route = {
+static Path const vPath_Defenders_Route = {
 	{ 5543.799f, 2825.115f, 515.386f },	         // Fortress Graveyard
 	{ 5548.690f, 2745.170f, 509.186f },
 	{ 5527.080f, 2718.280f, 491.877f },
@@ -133,7 +145,7 @@ static WgPath const vPath_WG_Defenders_Route = {
 };
 
 // Inner Fortress Path: From Fortress Front Court to Vault Door
-static WgPath const vPath_WG_Inner_Fortress_Path = {
+static Path const vPath_Inner_Fortress_Path = {
 	{ 5215.000f, 2841.200f, 409.192f, 0 },		 // Fortress Front Court and connections to Alliance Route, Horde Route Part B,
 												 //      Fortress SW Exit Path, Fortress SE Exit Path, and Outer Fortress Path
 	{ 5272.000f, 2841.200f, 409.192f, 3768 },	 // Fortress Central Wall (destructible)
@@ -142,33 +154,33 @@ static WgPath const vPath_WG_Inner_Fortress_Path = {
 };
 
 // Auxiliary path: For exiting the fortress through its SE tower
-static WgPath const vPath_WG_Fortress_SE_Exit_Path = {
+static Path const vPath_Fortress_SE_Exit_Path = {
 	{ 5187.440f, 2759.230f, 413.492f },	         // Connection to Inner Fortress Path
 	{ 5187.590f, 2738.650f, 413.492f },
 	{ 5168.230f, 2717.280f, 413.492f },	         // Fortress SE Exit and connection to Alliance Route
 };
 
 // Auxiliary path: For exiting the fortress through its SW tower
-static WgPath const vPath_WG_Fortress_SW_Exit_Path = {
+static Path const vPath_Fortress_SW_Exit_Path = {
 	{ 5186.490f, 2921.640f, 413.494f },	         // Connection to Inner Fortress Path
 	{ 5186.100f, 2944.320f, 413.494f },
 	{ 5167.230f, 2964.020f, 413.494f },	         // Fortress SW Exit and connection to Horde Route Part B
 };
 
 // NE Workshop
-static WgPath const vPath_WG_NE_Workshop = {
+static Path const vPath_NE_Workshop = {
 	{ 4943.000f, 2388.200f, 324.045f },	         // NE Workshop Engineer
 	{ 4954.340f, 2414.220f, 320.176f },	         // Connection to Ring Road North
 };
 
 // NW Workshop
-static WgPath const vPath_WG_NW_Workshop = {
+static Path const vPath_NW_Workshop = {
 	{ 4961.000f, 3384.500f, 380.800f },	         // NW Workshop Engineer
 	{ 4946.560f, 3361.500f, 376.877f, 0, true }, // Connection to Ring Road North
 };
 
 // SE Workshop
-static WgPath const vPath_WG_SE_Workshop = {
+static Path const vPath_SE_Workshop = {
 	{ 4357.700f, 2353.700f, 379.896f },	         // SE Workshop Engineer
 	{ 4383.600f, 2348.460f, 376.318f },
 	{ 4458.200f, 2327.260f, 367.101f },	         // Connection to Ring Road South
@@ -176,12 +188,12 @@ static WgPath const vPath_WG_SE_Workshop = {
 };
 
 // SW Workshop
-static WgPath const vPath_WG_SW_Workshop = {
+static Path const vPath_SW_Workshop = {
 	{ 4353.200f, 3308.600f, 375.937f },	         // SW Workshop Engineer and connection to Ring Road South
 };
 
 // SE Tower: Straight road from the ring road to the tower
-static WgPath const vPath_WG_SE_Tower_Road = {
+static Path const vPath_SE_Tower_Road = {
 	{ 4467.910f, 1964.130f, 439.296f },	         // SE Tower
 	{ 4503.460f, 2047.800f, 413.551f },          // Connection to Far SE Path
 	{ 4541.210f, 2139.570f, 378.752f },
@@ -189,13 +201,13 @@ static WgPath const vPath_WG_SE_Tower_Road = {
 };
 
 // South Tower: Single coordinate that immediately connects to the ring road
-static WgPath const vPath_WG_South_Tower = {
+static Path const vPath_South_Tower = {
 	{ 4420.040f, 2823.010f, 409.931f },	         // South Tower and connection to Ring Road South
 };
 
 // SW Tower: Diverges from the ring road on the upper side, heads to the tower, then turns back to merge
 // into the ring road at the bottom.
-static WgPath const vPath_WG_SW_Tower_Road = {
+static Path const vPath_SW_Tower_Road = {
 	{ 4576.070f, 3408.500f, 359.965f },	         // Connection to Ring Road South towards NW Workshop
 	{ 4555.770f, 3476.150f, 363.415f },
 	{ 4555.940f, 3556.160f, 386.661f },
@@ -207,27 +219,27 @@ static WgPath const vPath_WG_SW_Tower_Road = {
 };
 
 // Auxiliary path: For navigation from the eastern side of the fortress to the front, while outside it
-static WgPath const vPath_WG_Fortress_Bypath_East = {
+static Path const vPath_Fortress_Bypath_East = {
     { 5164.035f, 2698.225f, 404.097f },	         // Connections to SE Exit Path and double to Alliance Route
 	{ 5133.060f, 2722.050f, 409.182f },
 	{ 5113.960f, 2755.300f, 408.008f },          // Connection to Outer Fortress Path
 };
 
 // Auxiliary path: For navigation from the western side of the fortress to the front, while outside it
-static WgPath const vPath_WG_Fortress_Bypath_West = {
+static Path const vPath_Fortress_Bypath_West = {
     { 5163.267f, 2984.374f, 409.141f },	         // Connections to SW Exit Path and double to Horde Route Part B
 	{ 5131.660f, 2961.040f, 409.082f },
 	{ 5113.960f, 2927.860f, 408.599f },          // Connection to Outer Fortress Path
 };
 
 // Outer Fortress Path: From Ring Road North to Fortress Gate
-static WgPath const vPath_WG_Outer_Fortress_Path = {
+static Path const vPath_Outer_Fortress_Path = {
 	{ 5158.000f, 2841.200f, 408.799f, 3763 }, 	 // Fortress Gate (destructible) and connections to Inner Fortress Path
 	{ 5108.114f, 2843.619f, 402.798f }, 		 // Connections to Ring Road North, Fortress Bypath East, and Fortress Bypath West
 };
 
 // Auxiliary path: From the far SE edges to the rest of the map
-static WgPath const vPath_WG_Far_SE_Path = {
+static Path const vPath_Far_SE_Path = {
     { 4277.794f, 1827.926f, 350.595f },
     { 4371.759f, 1810.238f, 354.242f },
     { 4454.418f, 1852.759f, 373.527f },
@@ -236,7 +248,7 @@ static WgPath const vPath_WG_Far_SE_Path = {
 };
 
 // Auxiliary path: From the far SW edges to the rest of the map
-static WgPath const vPath_WG_Far_SW_Path = {
+static Path const vPath_Far_SW_Path = {
     { 4918.395f, 3686.224f, 352.428f },		     // Connection to Horde Route Part A
     { 4831.536f, 3728.451f, 350.424f },
     { 4741.445f, 3757.678f, 355.753f },
@@ -253,7 +265,7 @@ static WgPath const vPath_WG_Far_SW_Path = {
 };
 
 // Auxiliary path: From the far NW edges to the rest of the map
-static WgPath const vPath_WG_Far_NW_Path = {
+static Path const vPath_Far_NW_Path = {
     { 5104.822f, 3398.345f, 356.628f },          // Connection to Horde Route Part A
     { 5184.610f, 3395.535f, 356.526f },
     { 5274.457f, 3345.488f, 356.526f },
@@ -263,7 +275,7 @@ static WgPath const vPath_WG_Far_NW_Path = {
 };
 
 // Auxiliary path: From the far east edges to the rest of the map
-static WgPath const vPath_WG_Far_East_Path = {
+static Path const vPath_Far_East_Path = {
     { 4837.589f, 1887.022f, 446.530f },
     { 4745.480f, 1882.260f, 446.206f },
     { 4689.004f, 1951.491f, 427.119f },          // Connection to Far East SE Bypath
@@ -274,43 +286,43 @@ static WgPath const vPath_WG_Far_East_Path = {
 };
 
 // Auxiliary path: Connecting the Far SE and Far East paths
-static WgPath const vPath_WG_Far_SE_East_Bypath = {
+static Path const vPath_Far_SE_East_Bypath = {
     { 4619.401f, 1952.173f, 423.072f },          // Connections to Far SE Path and Far East Path
 };
 
 // Fortress Workshop East
-static WgPath const vPath_WG_Fortress_Workshop_East = {
+static Path const vPath_Fortress_Workshop_East = {
     { 5391.800f, 2712.400f, 412.942f },          // Fortress Workshop East Engineer
     { 5342.800f, 2718.600f, 409.167f, 0, true }, // Connection to NE Exit Path
     { 5342.800f, 2762.000f, 409.191f, 0, true }, // Connections to Inner Fortress Path and Defenders Route
 };
 
 // Fortress Workshop West
-static WgPath const vPath_WG_Fortress_Workshop_West = {
+static Path const vPath_Fortress_Workshop_West = {
     { 5392.900f, 2980.000f, 413.113f },          // Fortress Workshop West Engineer
     { 5342.800f, 2984.800f, 409.192f, 0, true }, // Connection to NW Exit Path
     { 5342.800f, 2917.800f, 409.192f, 0, true }, // Connection to Inner Fortress Path
 };
 
 // Auxiliary path: Connecting the vehicle teleporter exit point to the rest of the map
-static WgPath const vPath_WG_Vehicle_Tele_Con_East = {
+static Path const vPath_Vehicle_Tele_Con_East = {
     { 5256.993f, 2704.333f, 409.191f },          // Connection to Alliance Route
 };
 
 // Auxiliary path: Connecting the vehicle teleporter exit point to the rest of the map
-static WgPath const vPath_WG_Vehicle_Tele_Con_West = {
+static Path const vPath_Vehicle_Tele_Con_West = {
     { 5257.326f, 2976.304f, 409.191f },          // Connection to Horde Route B
 };
 
 // Auxiliary path: For exiting the fortress through its NE tower
-static WgPath const vPath_WG_Fortress_NE_Exit_Path = {
+static Path const vPath_Fortress_NE_Exit_Path = {
     { 5293.171f, 2654.581f, 413.403f, 0, true }, // Connection to Fortress Workshop East
     { 5268.100f, 2654.366f, 413.403f },
     { 5249.127f, 2636.415f, 413.403f },          // Fortress NE Exit and connection to Alliance Route
 };
 
 // Auxiliary path: For exiting the fortress through its NW tower
-static WgPath const vPath_WG_Fortress_NW_Exit_Path = {
+static Path const vPath_Fortress_NW_Exit_Path = {
     { 5293.425f, 3023.295f, 412.148f, 0, true }, // Connection to Fortress Workshop West
     { 5268.628f, 3024.847f, 412.148f },
     { 5250.163f, 3044.446f, 412.148f },          // Fortress NW Exit and connection to Horde Route Part B
@@ -319,7 +331,7 @@ static WgPath const vPath_WG_Fortress_NW_Exit_Path = {
 // Fortress Cannons: the fortress has 24 cannons, but only these 12 cover the typical hostile approaches. Each cannon
 // is a single-waypoint A* path (paths 33-44) that's connected with a junction to a path inside the fortress. The
 // cannon scanner matches creatures against these same coordinates, keeping one source of truth for cannon positions.
-static WgPath const g_WgCannonPaths[] = {
+static Path const g_CannonPaths[] = {
     { { 5264.887f, 2704.792f, 421.783f } },      // Connected to Fortress Workshop East
     { { 5236.105f, 2732.727f, 421.732f } },      // Connected to Fortress Front Court
     { { 5163.863f, 2721.933f, 439.928f } },      // Connected to SE fortress tower
@@ -333,119 +345,119 @@ static WgPath const g_WgCannonPaths[] = {
     { { 5264.585f, 2819.800f, 421.739f } },      // Connected to Fortress Central Wall
     { { 5264.236f, 2861.381f, 421.669f } },      // Connected to Fortress Central Wall
 };
-static constexpr uint8 WG_DEFENDER_CANNON_COUNT = 12;
+static constexpr uint8 DEFENDER_CANNON_COUNT = 12;
 
 // General objectives positions:
 // Infantry objectives:
-static Position const WG_OBJ_INI_CONF_EAST  = { 5165.662f, 2608.387f, 382.992f, 0.0f };   // Eastern pre-wall-fall conflict
-static Position const WG_OBJ_INI_CONF_WEST  = { 5152.640f, 3074.960f, 380.069f, 0.0f };   // Western pre-wall-fall conflict
-static Position const WG_OBJ_CENTRAL_COURT  = { 5342.800f, 2841.200f, 409.240f, 0.0f };   // Attackers goal
-static Position const WG_OBJ_FRONT_COURT    = { 5215.000f, 2841.200f, 409.192f, 0.0f };   // Defenders goal
+static Position const OBJ_INI_CONFLICT_EAST  = { 5165.662f, 2608.387f, 382.992f, 0.0f };   // Eastern pre-wall-fall conflict
+static Position const OBJ_INI_CONFLICT_WEST  = { 5152.640f, 3074.960f, 380.069f, 0.0f };   // Western pre-wall-fall conflict
+static Position const OBJ_CENTRAL_COURT      = { 5342.800f, 2841.200f, 409.240f, 0.0f };   // Attackers goal
+static Position const OBJ_FRONT_COURT        = { 5215.000f, 2841.200f, 409.192f, 0.0f };   // Defenders goal
 // Vehicle objectives:
-static Position const WG_OBJ_CENTRAL_STAGE  = { 5051.660f, 2847.730f, 393.182f, 0.0f };   // Central staging area
-static Position const WG_OBJ_DEF_GUARD_EAST = { 5195.485f, 2691.625f, 405.725f, 0.0f };   // East wall defender vehicles guard point
-static Position const WG_OBJ_DEF_GUARD_WEST = { 5198.530f, 3000.700f, 404.440f, 0.0f };   // West wall defender vehicles guard point
-static Position const WG_OBJ_DEF_GUARD_GATE = { 5108.114f, 2843.619f, 402.798f, 0.0f };   // Fotress Gate defender vehicles guard point
-static Position const WG_OBJ_FORTRESS_GATE  = { 5158.000f, 2841.200f, 408.799f, 0.0f };   // Goal A (Gate)
-static Position const WG_OBJ_CENTRAL_WALL   = { 5272.000f, 2841.200f, 409.192f, 0.0f };   // Goal B (Central Wall)
-static Position const WG_OBJ_VAULT_DOOR     = { 5393.500f, 2841.200f, 418.675f, 0.0f };   // Goal C (Vault Door)
-static Position const WG_OBJ_EAST_WALL      = { 5215.000f, 2740.100f, 409.190f, 0.0f };   // Alternative goal A (Eastern Wall)
-static Position const WG_OBJ_WEST_WALL      = { 5215.000f, 2941.900f, 409.192f, 0.0f };   // Alternative goal A (Western Wall)
-static Position const WG_OBJ_WS_TELE_WEST   = { 5316.250f, 2977.040f, 408.539f, 0.0f };   // Fortress Vehicle Teleporter (Workshop West)
-static Position const WG_OBJ_WS_TELE_EAST   = { 5314.510f, 2703.690f, 408.550f, 0.0f };   // Fortress Vehicle Teleporter (Workshop East)
-static Position const WG_OBJ_SE_TOWER	    = { 4467.910f, 1964.130f, 439.296f, 0.0f };   // Attackers Tower (SE)
-static Position const WG_OBJ_SOUTH_TOWER    = { 4420.040f, 2823.010f, 409.931f, 0.0f };   // Attackers Tower (South)
-static Position const WG_OBJ_SW_TOWER       = { 4533.640f, 3595.070f, 397.198f, 0.0f };   // Attackers Tower (SW)
+static Position const OBJ_CENTRAL_STAGE      = { 5051.660f, 2847.730f, 393.182f, 0.0f };   // Central staging area
+static Position const OBJ_DEF_GUARD_EAST     = { 5195.485f, 2691.625f, 405.725f, 0.0f };   // East wall defender vehicles guard point
+static Position const OBJ_DEF_GUARD_WEST     = { 5198.530f, 3000.700f, 404.440f, 0.0f };   // West wall defender vehicles guard point
+static Position const OBJ_DEF_GUARD_GATE     = { 5108.114f, 2843.619f, 402.798f, 0.0f };   // Fotress Gate defender vehicles guard point
+static Position const OBJ_FORTRESS_GATE      = { 5158.000f, 2841.200f, 408.799f, 0.0f };   // Goal A (Gate)
+static Position const OBJ_CENTRAL_WALL       = { 5272.000f, 2841.200f, 409.192f, 0.0f };   // Goal B (Central Wall)
+static Position const OBJ_VAULT_DOOR         = { 5393.500f, 2841.200f, 418.675f, 0.0f };   // Goal C (Vault Door)
+static Position const OBJ_EAST_WALL          = { 5215.000f, 2740.100f, 409.190f, 0.0f };   // Alternative goal A (Eastern Wall)
+static Position const OBJ_WEST_WALL          = { 5215.000f, 2941.900f, 409.192f, 0.0f };   // Alternative goal A (Western Wall)
+static Position const OBJ_WORKSHOP_TELE_WEST = { 5316.250f, 2977.040f, 408.539f, 0.0f };   // Fortress Vehicle Teleporter (Workshop West)
+static Position const OBJ_WORKSHOP_TELE_EAST = { 5314.510f, 2703.690f, 408.550f, 0.0f };   // Fortress Vehicle Teleporter (Workshop East)
+static Position const OBJ_SE_TOWER           = { 4467.910f, 1964.130f, 439.296f, 0.0f };   // Attackers Tower (SE)
+static Position const OBJ_SOUTH_TOWER        = { 4420.040f, 2823.010f, 409.931f, 0.0f };   // Attackers Tower (South)
+static Position const OBJ_SW_TOWER           = { 4533.640f, 3595.070f, 397.198f, 0.0f };   // Attackers Tower (SW)
 
-// Workshop data for navigation. Maps workshop IDs to their WgPath. workshopId values are from BattlefieldWG.
-struct WgWorkshopData { uint8 workshopId; WgPath const* path; };
-static WgWorkshopData const WG_WORKSHOPS[] = {
-    { BATTLEFIELD_WG_WORKSHOP_NE,        &vPath_WG_NE_Workshop },            // NE - Sunken Ring
-    { BATTLEFIELD_WG_WORKSHOP_NW,        &vPath_WG_NW_Workshop },            // NW - Broken Temple
-    { BATTLEFIELD_WG_WORKSHOP_SE,        &vPath_WG_SE_Workshop },            // SE - Eastspark
-    { BATTLEFIELD_WG_WORKSHOP_SW,        &vPath_WG_SW_Workshop },            // SW - Westspark
-    { BATTLEFIELD_WG_WORKSHOP_KEEP_EAST, &vPath_WG_Fortress_Workshop_East},  // East - Fortress
-    { BATTLEFIELD_WG_WORKSHOP_KEEP_WEST, &vPath_WG_Fortress_Workshop_West},  // West - Fortress
+// Workshop data for navigation. Maps workshop IDs to their Path. workshopId values are from BattlefieldWG.
+struct WorkshopData { uint8 workshopId; Path const* path; };
+static WorkshopData const WORKSHOPS[] = {
+    { BATTLEFIELD_WG_WORKSHOP_NE,        &vPath_NE_Workshop },            // NE - Sunken Ring
+    { BATTLEFIELD_WG_WORKSHOP_NW,        &vPath_NW_Workshop },            // NW - Broken Temple
+    { BATTLEFIELD_WG_WORKSHOP_SE,        &vPath_SE_Workshop },            // SE - Eastspark
+    { BATTLEFIELD_WG_WORKSHOP_SW,        &vPath_SW_Workshop },            // SW - Westspark
+    { BATTLEFIELD_WG_WORKSHOP_KEEP_EAST, &vPath_Fortress_Workshop_East},  // East - Fortress
+    { BATTLEFIELD_WG_WORKSHOP_KEEP_WEST, &vPath_Fortress_Workshop_West},  // West - Fortress
 };
 
-// Values of WG_WORKSHOPS[] indices, whose entries are used to reference a workshop's ID and path.
-static constexpr uint8 WG_WS_IDX_NE        = 0;
-static constexpr uint8 WG_WS_IDX_NW        = 1;
-static constexpr uint8 WG_WS_IDX_SE        = 2;
-static constexpr uint8 WG_WS_IDX_SW        = 3;
-static constexpr uint8 WG_WS_IDX_FORT_EAST = 4;
-static constexpr uint8 WG_WS_IDX_FORT_WEST = 5;
+// Values of WORKSHOPS[] indices, whose entries are used to reference a workshop's ID and path.
+static constexpr uint8 WORKSHOP_IDX_NE        = 0;
+static constexpr uint8 WORKSHOP_IDX_NW        = 1;
+static constexpr uint8 WORKSHOP_IDX_SE        = 2;
+static constexpr uint8 WORKSHOP_IDX_SW        = 3;
+static constexpr uint8 WORKSHOP_IDX_FORT_EAST = 4;
+static constexpr uint8 WORKSHOP_IDX_FORT_WEST = 5;
 
-static WgPath const* const g_AllWgPaths[] = {
-    &vPath_WG_Ring_Road_North,          // Path  0 - Waypoints: 21
-    &vPath_WG_Ring_Road_South,          // Path  1 - Waypoints: 21
-    &vPath_WG_Central_Road,             // Path  2 - Waypoints: 5
-    &vPath_WG_Alliance_Route,           // Path  3 - Waypoints: 9
-    &vPath_WG_Alliance_Bypath,          // Path  4 - Waypoints: 4
-    &vPath_WG_Horde_Route_Part_A,       // Path  5 - Waypoints: 5
-    &vPath_WG_Horde_Route_Part_B,       // Path  6 - Waypoints: 4
-    &vPath_WG_Horde_Bypath,             // Path  7 - Waypoints: 1
-    &vPath_WG_Defenders_Route,          // Path  8 - Waypoints: 6
-    &vPath_WG_Inner_Fortress_Path,      // Path  9 - Waypoints: 4
-    &vPath_WG_Fortress_SE_Exit_Path,    // Path 10 - Waypoints: 3
-    &vPath_WG_Fortress_SW_Exit_Path,    // Path 11 - Waypoints: 3
-    &vPath_WG_NE_Workshop,              // Path 12 - Waypoints: 2
-    &vPath_WG_NW_Workshop,              // Path 13 - Waypoints: 2
-    &vPath_WG_SE_Workshop,              // Path 14 - Waypoints: 3
-    &vPath_WG_SW_Workshop,              // Path 15 - Waypoints: 1
-    &vPath_WG_SE_Tower_Road,            // Path 16 - Waypoints: 4
-    &vPath_WG_South_Tower,              // Path 17 - Waypoints: 1
-    &vPath_WG_SW_Tower_Road,            // Path 18 - Waypoints: 8
-    &vPath_WG_Outer_Fortress_Path,      // Path 19 - Waypoints: 2
-    &vPath_WG_Fortress_Bypath_East,     // Path 20 - Waypoints: 3
-    &vPath_WG_Fortress_Bypath_West,     // Path 21 - Waypoints: 3
-    &vPath_WG_Far_SE_Path,              // Path 22 - Waypoints: 5
-    &vPath_WG_Far_SW_Path,              // Path 23 - Waypoints: 13
-    &vPath_WG_Far_NW_Path,              // Path 24 - Waypoints: 6
-    &vPath_WG_Far_East_Path,            // Path 25 - Waypoints: 7
-    &vPath_WG_Far_SE_East_Bypath,       // Path 26 - Waypoints: 1
-    &vPath_WG_Fortress_Workshop_East,   // Path 27 - Waypoints: 3
-    &vPath_WG_Fortress_Workshop_West,   // Path 28 - Waypoints: 3
-    &vPath_WG_Vehicle_Tele_Con_East,    // Path 29 - Waypoints: 1
-    &vPath_WG_Vehicle_Tele_Con_West,    // Path 30 - Waypoints: 1
-    &vPath_WG_Fortress_NE_Exit_Path,    // Path 31 - Waypoints: 3
-    &vPath_WG_Fortress_NW_Exit_Path,    // Path 32 - Waypoints: 3
-    &g_WgCannonPaths[0],                // Path 33 - Defender cannon 0
-    &g_WgCannonPaths[1],                // Path 34 - Defender cannon 1
-    &g_WgCannonPaths[2],                // Path 35 - Defender cannon 2
-    &g_WgCannonPaths[3],                // Path 36 - Defender cannon 3
-    &g_WgCannonPaths[4],                // Path 37 - Defender cannon 4
-    &g_WgCannonPaths[5],                // Path 38 - Defender cannon 5
-    &g_WgCannonPaths[6],                // Path 39 - Defender cannon 6
-    &g_WgCannonPaths[7],                // Path 40 - Defender cannon 7
-    &g_WgCannonPaths[8],                // Path 41 - Defender cannon 8
-    &g_WgCannonPaths[9],                // Path 42 - Defender cannon 9
-    &g_WgCannonPaths[10],               // Path 43 - Defender cannon 10
-    &g_WgCannonPaths[11],               // Path 44 - Defender cannon 11
+static Path const* const g_AllPaths[] = {
+    &vPath_Ring_Road_North,             // Path  0 - Waypoints: 21
+    &vPath_Ring_Road_South,             // Path  1 - Waypoints: 21
+    &vPath_Central_Road,                // Path  2 - Waypoints: 5
+    &vPath_Alliance_Route,              // Path  3 - Waypoints: 9
+    &vPath_Alliance_Bypath,             // Path  4 - Waypoints: 4
+    &vPath_Horde_Route_Part_A,          // Path  5 - Waypoints: 5
+    &vPath_Horde_Route_Part_B,          // Path  6 - Waypoints: 4
+    &vPath_Horde_Bypath,                // Path  7 - Waypoints: 1
+    &vPath_Defenders_Route,             // Path  8 - Waypoints: 6
+    &vPath_Inner_Fortress_Path,         // Path  9 - Waypoints: 4
+    &vPath_Fortress_SE_Exit_Path,       // Path 10 - Waypoints: 3
+    &vPath_Fortress_SW_Exit_Path,       // Path 11 - Waypoints: 3
+    &vPath_NE_Workshop,                 // Path 12 - Waypoints: 2
+    &vPath_NW_Workshop,                 // Path 13 - Waypoints: 2
+    &vPath_SE_Workshop,                 // Path 14 - Waypoints: 3
+    &vPath_SW_Workshop,                 // Path 15 - Waypoints: 1
+    &vPath_SE_Tower_Road,               // Path 16 - Waypoints: 4
+    &vPath_South_Tower,                 // Path 17 - Waypoints: 1
+    &vPath_SW_Tower_Road,               // Path 18 - Waypoints: 8
+    &vPath_Outer_Fortress_Path,         // Path 19 - Waypoints: 2
+    &vPath_Fortress_Bypath_East,        // Path 20 - Waypoints: 3
+    &vPath_Fortress_Bypath_West,        // Path 21 - Waypoints: 3
+    &vPath_Far_SE_Path,                 // Path 22 - Waypoints: 5
+    &vPath_Far_SW_Path,                 // Path 23 - Waypoints: 13
+    &vPath_Far_NW_Path,                 // Path 24 - Waypoints: 6
+    &vPath_Far_East_Path,               // Path 25 - Waypoints: 7
+    &vPath_Far_SE_East_Bypath,          // Path 26 - Waypoints: 1
+    &vPath_Fortress_Workshop_East,      // Path 27 - Waypoints: 3
+    &vPath_Fortress_Workshop_West,      // Path 28 - Waypoints: 3
+    &vPath_Vehicle_Tele_Con_East,       // Path 29 - Waypoints: 1
+    &vPath_Vehicle_Tele_Con_West,       // Path 30 - Waypoints: 1
+    &vPath_Fortress_NE_Exit_Path,       // Path 31 - Waypoints: 3
+    &vPath_Fortress_NW_Exit_Path,       // Path 32 - Waypoints: 3
+    &g_CannonPaths[0],                  // Path 33 - Defender cannon 0
+    &g_CannonPaths[1],                  // Path 34 - Defender cannon 1
+    &g_CannonPaths[2],                  // Path 35 - Defender cannon 2
+    &g_CannonPaths[3],                  // Path 36 - Defender cannon 3
+    &g_CannonPaths[4],                  // Path 37 - Defender cannon 4
+    &g_CannonPaths[5],                  // Path 38 - Defender cannon 5
+    &g_CannonPaths[6],                  // Path 39 - Defender cannon 6
+    &g_CannonPaths[7],                  // Path 40 - Defender cannon 7
+    &g_CannonPaths[8],                  // Path 41 - Defender cannon 8
+    &g_CannonPaths[9],                  // Path 42 - Defender cannon 9
+    &g_CannonPaths[10],                 // Path 43 - Defender cannon 10
+    &g_CannonPaths[11],                 // Path 44 - Defender cannon 11
 };
-static constexpr uint8 WG_PATH_COUNT = 45;  // Total waypoints: 173
+static constexpr uint8 PATH_COUNT = 45; // Total waypoints: 173
 
 // WorldState IDs for the four passable fortress obstacles.
 // These are the IDs broadcast via UpdateWorldState when building state changes,
 // allowing state checks from anywhere on the map without range-limited GO scanning.
-static constexpr uint32 WG_WS_FORTRESS_GATE  = 3763;  // Entry 190375 - Fortress Gate
-static constexpr uint32 WG_WS_EAST_WALL      = 3757;  // Entry 190372 - Eastern Wall
-static constexpr uint32 WG_WS_WEST_WALL      = 3754;  // Entry 190371 - Western Wall
-static constexpr uint32 WG_WS_CENTRAL_WALL   = 3768;  // Entry 191805 - Central Wall
-static constexpr uint32 WG_WS_VAULT_DOOR     = 3773;  // Entry 191810 - Vault Door
+static constexpr uint32 WS_FORTRESS_GATE  = 3763;  // Entry 190375 - Fortress Gate
+static constexpr uint32 WS_EAST_WALL      = 3757;  // Entry 190372 - Eastern Wall
+static constexpr uint32 WS_WEST_WALL      = 3754;  // Entry 190371 - Western Wall
+static constexpr uint32 WS_CENTRAL_WALL   = 3768;  // Entry 191805 - Central Wall
+static constexpr uint32 WS_VAULT_DOOR     = 3773;  // Entry 191810 - Vault Door
 
 // WorldState IDs for the three attacker towers.
-static constexpr uint32 WG_WS_TOWER_SE       = 3706;  // Entry 190358 - SE Tower (Flamewatch)
-static constexpr uint32 WG_WS_TOWER_SOUTH    = 3705;  // Entry 190357 - South Tower (Winter's Edge)
-static constexpr uint32 WG_WS_TOWER_SW       = 3704;  // Entry 190356 - SW Tower (Shadowsight)
+static constexpr uint32 WS_TOWER_SE       = 3706;  // Entry 190358 - SE Tower (Flamewatch)
+static constexpr uint32 WS_TOWER_SOUTH    = 3705;  // Entry 190357 - South Tower (Winter's Edge)
+static constexpr uint32 WS_TOWER_SW       = 3704;  // Entry 190356 - SW Tower (Shadowsight)
 
 // Cross-path junction edges connecting waypoints across different paths.
 // oneWay=true: only the A->B edge is added (pathA is the source direction).
 // blockWorldState!=0: the edge is impassable to all until the wall with that WorldState ID is destroyed. Vehicles
 // can still approach (without crossing) a standing blocker, as their attack objective is the wall node itself.
 // blockAura!=0: the edge is impassable to any bot that currently has the aura with that spell ID.
-struct WgJunctionDef { uint8 pathA, wpA, pathB, wpB; bool oneWay = false; uint32 blockWorldState = 0; uint32 blockAura = 0; };
-static WgJunctionDef const WG_JUNCTIONS[] = {
+struct JunctionDef { uint8 pathA, wpA, pathB, wpB; bool oneWay = false; uint32 blockWorldState = 0; uint32 blockAura = 0; };
+static JunctionDef const PATH_JUNCTIONS[] = {
     // Bi-directional junctions:
     {  0,  0,   1, 20 },  // RRN[0]      <->    RRS[20]     Western connection of ring roads
     {  0, 20,   1,  0 },  // RRN[20]     <->    RRS[0]      Eastern connection of ring roads
@@ -520,9 +532,9 @@ static WgJunctionDef const WG_JUNCTIONS[] = {
     { 32,  2,   6,  2, true },  // NW_Exit[2]  ->    HR_B[2]     From NW fortress tower to Horde Route B
 
     // Object-blocked junctions:
-    {  9,  0,   3,  8,  false, WG_WS_EAST_WALL },       // IFP[0]   <->   AR[8]     East wall
-    {  9,  0,   6,  3,  false, WG_WS_WEST_WALL },       // IFP[0]   <->   HR_B[3]   West wall
-    {  9,  0,  19,  0,  false, WG_WS_FORTRESS_GATE },   // IFP[0]   <->   OFP[0]    Front Gate
+    {  9,  0,   3,  8,  false, WS_EAST_WALL },       // IFP[0]   <->   AR[8]     East wall
+    {  9,  0,   6,  3,  false, WS_WEST_WALL },       // IFP[0]   <->   HR_B[3]   West wall
+    {  9,  0,  19,  0,  false, WS_FORTRESS_GATE },   // IFP[0]   <->   OFP[0]    Front Gate
 
     // Mono-directional, aura based blocked junctions:
     // These paths are a quick exit shortcut, but Recruit bots should be forced through the Inner Fortress Path to increase
@@ -530,5 +542,7 @@ static WgJunctionDef const WG_JUNCTIONS[] = {
     { 27,  1,  31,  0, true,  0, SPELL_RECRUIT },       // F_WS_E[1]   ->    NE_Exit[0]  From Fortress Workshop East to NE Exit
     { 28,  1,  32,  0, true,  0, SPELL_RECRUIT },       // F_WS_W[1]   ->    NW_Exit[0]  From Fortress Workshop West to NW Exit
 };
+
+}  // namespace Wg
 
 #endif  // _PLAYERBOT_BATTLEFIELDPATHS_H

@@ -35,193 +35,195 @@
 #include <unordered_map>
 #include <unordered_set>
 
-// Snap radius: match a cannon creature to a known g_WgCannonPaths entry.
-static constexpr float  WG_CANNON_SEARCH_RADIUS        = 5.0f;
+using namespace Wg;  // path data, objectives, and graph tables live in BattlefieldPaths.h
+
+// Snap radius: match a cannon creature to a known g_CannonPaths entry.
+static constexpr float  CANNON_SEARCH_RADIUS        = 5.0f;
 // Base interval (ms) between WgMountTowerCannonAction scans, multiplied by level stagger.
-static constexpr uint32 WG_SCAN_INTERVAL               = 15000;
+static constexpr uint32 CANNON_SCAN_INTERVAL        = 15000;
 // Distance to Central Wall. Ensures defenders won't scan for cannons when they are far from the wall.
-static constexpr float  WG_CANNON_CENTRAL_WALL_RANGE   = 150.0f;
+static constexpr float  CANNON_CENTRAL_WALL_RANGE   = 150.0f;
 // If a defender scans for a cannon, it will only scan within this range of itself.
-static constexpr float  WG_OBJ_SCAN_RANGE              = 250.0f;
-// Distance at which FollowWgRoute advances to the next A* waypoint (halved for vehicles).
-static constexpr float  WG_NODE_SWITCH_DIST            = 20.0f;
+static constexpr float  OBJ_SCAN_RANGE              = 250.0f;
+// Distance at which FollowRoute advances to the next A* waypoint (halved for vehicles).
+static constexpr float  NODE_SWITCH_DIST            = 20.0f;
 // Bot must be within this distance of a noSkip waypoint before it can advance past it.
-static constexpr float  WG_NOSKIP_ARRIVE_DIST          = 5.0f;
-// FollowWgRoute returns false (arrived) when bot is within this distance of the objective.
-static constexpr float  WG_OBJ_ARRIVE_DIST             = 10.0f;
+static constexpr float  NOSKIP_ARRIVE_DIST          = 5.0f;
+// FollowRoute returns false (arrived) when bot is within this distance of the objective.
+static constexpr float  OBJ_ARRIVE_DIST             = 10.0f;
 // Workshop capture arrival latch triggers at this distance, enabling combat around the workshop.
-static constexpr float  WG_WORKSHOP_ARRIVE_DIST        = 80.0f;
+static constexpr float  WORKSHOP_ARRIVE_DIST        = 80.0f;
 // Attacker vehicle phases 1/3/5 advance when bot is within this distance of the staging point.
-static constexpr float  WG_STAGING_ARRIVE_DIST         = 10.0f;
+static constexpr float  STAGING_ARRIVE_DIST         = 10.0f;
 // FindNearestGameObject range for locating a fortress wall GO to attack.
-static constexpr float  WG_WALL_SCAN_DIST              = 80.0f;
+static constexpr float  WALL_SCAN_DIST              = 80.0f;
 // Distance at which attacker vehicles begin casting melee spells at a wall.
-static constexpr float  WG_WALL_MELEE_DIST             = 10.0f;
+static constexpr float  WALL_MELEE_DIST             = 10.0f;
 // FindNearestGameObject range for locating a tower GO to attack.
-static constexpr float  WG_TOWER_SCAN_DIST             = 80.0f;
+static constexpr float  TOWER_SCAN_DIST             = 80.0f;
 // Distance at which defender vehicles begin casting melee spells at a tower.
 // 35 yards melee range instead of 10 yards for attackers, because towers are not flat like walls.
-static constexpr float  WG_TOWER_MELEE_DIST            = 35.0f;
+static constexpr float  TOWER_MELEE_DIST            = 35.0f;
 // FindNearestCreature range for locating the workshop engineer NPC to summon a vehicle.
-static constexpr float  ENGINEER_SCAN_RANGE            = 12.0f;
+static constexpr float  ENGINEER_SCAN_RANGE         = 12.0f;
 // Phase 4 defender vehicles keep at least this distance from each other.
-static constexpr float  WG_DEF_VEH_DISPERSE_DIST       = 8.0f;
+static constexpr float  DEF_VEH_DISPERSE_DIST       = 8.0f;
 // Defender vehicles dispersion only kicks in within this minimum radius of the objective, or
-// 2 * WG_DEF_VEH_DISPERSE_DIST (whichever is highest) to reduce movement oscillation.
-static constexpr float  WG_DEF_VEH_MIN_GUARD_RADIUS    = 20.0f;
+// 2 * DEF_VEH_DISPERSE_DIST (whichever is highest) to reduce movement oscillation.
+static constexpr float  DEF_VEH_MIN_GUARD_RADIUS    = 20.0f;
 
 // ################# //
 // A* Waypoint Graph
 // ################# //
 
 // Path blocking mechanics:
-// Node block (WgNode::pathBlock): building stands AT the waypoint. Vehicles hold and attack it, but infantry pass.
-// Edge block (WgEdge::blockWorldState): passage BETWEEN waypoints (junctions) is sealed for everyone until destroyed.
+// Node block (Node::pathBlock): building stands AT the waypoint. Vehicles hold and attack it, but infantry pass.
+// Edge block (Edge::blockWorldState): passage BETWEEN waypoints (junctions) is sealed for everyone until destroyed.
 // Solid barriers use both, meanwhile blockers with infantry gaps use only the node block.
-struct WgEdge { uint32 target; uint32 blockWorldState = 0; uint32 blockAura = 0; };
+struct Edge { uint32 target; uint32 blockWorldState = 0; uint32 blockAura = 0; };
 
-struct WgNode
+struct Node
 {
     float    x, y, z;
     uint32   pathBlock;     // WorldState ID of the building standing at this node (0 = none)
     bool     noSkip;        // true = next waypoint skipping logic is limited
     bool     noVehicle;     // true = A* skips this node when routing vehicles
-    std::vector<WgEdge> adj;
+    std::vector<Edge> adj;
 };
-static std::vector<WgNode> g_WgGraph;
-static std::once_flag      g_WgGraphOnce;
+static std::vector<Node> g_Graph;
+static std::once_flag      g_GraphOnce;
 
 // Builds the A* waypoint graph from path and junction definitions. Called once on first use via std::call_once.
-static void BuildWgGraph()
+static void BuildGraph()
 {
-    std::call_once(g_WgGraphOnce, []()
+    std::call_once(g_GraphOnce, []()
     {
-        uint32 pathOffset[WG_PATH_COUNT] = {};
+        uint32 pathOffset[PATH_COUNT] = {};
 
         // Step 1: Add all nodes, recording the start index of each path.
-        for (uint8 i = 0; i < WG_PATH_COUNT; ++i)
+        for (uint8 i = 0; i < PATH_COUNT; ++i)
         {
-            pathOffset[i] = static_cast<uint32>(g_WgGraph.size());
-            for (WgWaypoint const& wp : *g_AllWgPaths[i])
-                g_WgGraph.push_back({ wp.x, wp.y, wp.z, wp.pathBlock, wp.noSkip, false, {} });
+            pathOffset[i] = static_cast<uint32>(g_Graph.size());
+            for (Waypoint const& wp : *g_AllPaths[i])
+                g_Graph.push_back({ wp.x, wp.y, wp.z, wp.pathBlock, wp.noSkip, false, {} });
         }
 
         // Paths A* never routes vehicles through:
         //      SE/SW and NE/NW fortress tower exits (10, 11, 31, 32).
         //      Fortress workshop paths (27, 28). Vehicles spawn here but leave only by a direct MoveTo to the teleporters, never A*.
         //      Defender cannon waypoints (33-44). Each sits on a wall where vehicles never path.
-        static constexpr uint8 WG_NO_VEHICLE_PATHS[] = { 10, 11, 27, 28, 31, 32,
+        static constexpr uint8 NO_VEHICLE_PATHS[] = { 10, 11, 27, 28, 31, 32,
                                                          33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44 };
-        for (uint8 p : WG_NO_VEHICLE_PATHS)
+        for (uint8 p : NO_VEHICLE_PATHS)
         {
             uint32 base = pathOffset[p];
-            uint32 len  = static_cast<uint32>(g_AllWgPaths[p]->size());
+            uint32 len  = static_cast<uint32>(g_AllPaths[p]->size());
             for (uint32 j = 0; j < len; ++j)
-                g_WgGraph[base + j].noVehicle = true;
+                g_Graph[base + j].noVehicle = true;
         }
 
         // Step 2: Within-path sequential edges (bidirectional).
-        for (uint8 i = 0; i < WG_PATH_COUNT; ++i)
+        for (uint8 i = 0; i < PATH_COUNT; ++i)
         {
             uint32 base = pathOffset[i];
-            uint32 len  = static_cast<uint32>(g_AllWgPaths[i]->size());
+            uint32 len  = static_cast<uint32>(g_AllPaths[i]->size());
             for (uint32 j = 0; j < len - 1; ++j)
             {
-                g_WgGraph[base + j    ].adj.push_back({ base + j + 1, 0 });
-                g_WgGraph[base + j + 1].adj.push_back({ base + j,     0 });
+                g_Graph[base + j    ].adj.push_back({ base + j + 1, 0 });
+                g_Graph[base + j + 1].adj.push_back({ base + j,     0 });
             }
         }
 
         // Step 3: Cross-path junction edges. Bidirectional unless oneWay is set, in which case only the A->B edge
         // is added (pathA is the source).
-        for (auto const& junc : WG_JUNCTIONS)
+        for (auto const& junc : PATH_JUNCTIONS)
         {
             uint32 nodeA = pathOffset[junc.pathA] + junc.wpA;
             uint32 nodeB = pathOffset[junc.pathB] + junc.wpB;
-            g_WgGraph[nodeA].adj.push_back({ nodeB, junc.blockWorldState, junc.blockAura });
+            g_Graph[nodeA].adj.push_back({ nodeB, junc.blockWorldState, junc.blockAura });
             if (!junc.oneWay)
-                g_WgGraph[nodeB].adj.push_back({ nodeA, junc.blockWorldState, junc.blockAura });
+                g_Graph[nodeB].adj.push_back({ nodeA, junc.blockWorldState, junc.blockAura });
         }
     });
 }
 
-static constexpr float  CANNON_TARGET_SCAN          = 85.0f;    // Lock on targets somewhat beyond cannon's range (70).
-static constexpr float  VEHICLE_TARGET_SCAN         = 65.0f;    // Don't look at targets beyond 70 yards. That will cause
+static constexpr float  CANNON_TARGET_SCAN      = 85.0f;    // Lock on targets somewhat beyond cannon's range (70).
+static constexpr float  VEHICLE_TARGET_SCAN     = 65.0f;    // Don't look at targets beyond 70 yards. That will cause
                                                                     // fallback of hurl boulder to ram instead.
 
 // For defender vehicles, priority one is defending the fortress, then sending vehicles to attack the towers if needed, finally the
 // overflow is sent to actively hunt attacker vehicles. Each hunt target is tagged by the first defender hunter that finds it.
-static constexpr uint8  VEHICLE_FORT_GUARD_MIN      = 3;        // Pre-breach: min defender vehicles guarding the gate or wall (each).
-static constexpr uint8  VEHICLE_FORT_GUARD_MAX      = 4;        // Pre-breach: max guarding the gate or wall (each).
-static constexpr uint8  VEHICLE_COURT_GUARD         = 8;        // Post-breach: max defender vehicles holding the court.
+static constexpr uint8  VEHICLE_FORT_GUARD_MIN  = 3;        // Pre-breach: min defender vehicles guarding the gate or wall (each).
+static constexpr uint8  VEHICLE_FORT_GUARD_MAX  = 4;        // Pre-breach: max guarding the gate or wall (each).
+static constexpr uint8  VEHICLE_COURT_GUARD     = 8;        // Post-breach: max defender vehicles holding the court.
 
 // Counter for defender vehicles assigned to...
-static std::atomic<int32_t> s_WgFortGuardAtStage{0};            // Guard the fortress wall most likely to be attacked (faction dependent),
-static std::atomic<int32_t> s_WgFortGuardAtGate{0};             // guard the fortress gate,
-static std::atomic<int32_t> s_WgGuardAtCourt{0};                // guard a fortress court,
-static std::atomic<int32_t> s_WgGuardAtWar{0};                  // or to hunt attacker vehicles.
+static std::atomic<int32_t> s_FortGuardAtStage{0};          // Guard the fortress wall most likely to be attacked (faction dependent),
+static std::atomic<int32_t> s_FortGuardAtGate{0};           // guard the fortress gate,
+static std::atomic<int32_t> s_GuardAtCourt{0};              // guard a fortress court,
+static std::atomic<int32_t> s_GuardAtWar{0};                // or to hunt attacker vehicles.
 
-static constexpr uint32 GUARD_REBALANCE_PERIOD      = 10000u;   // Period to re-evaluate fort guard positions.
-static std::mutex           s_WgFortGuardPosMtx;                // Sequences fort guard slot claims and Stage/Gate/Court/War assignment.
+static constexpr uint32 GUARD_REBALANCE_PERIOD  = 10000u;   // Period to re-evaluate fort guard positions.
+static std::mutex           s_FortGuardPosMtx;              // Sequences fort guard slot claims and Stage/Gate/Court/War assignment.
 
-static constexpr uint32 WG_WAR_SCAN_PERIOD          = 10000u;   // Period between hunt target scans while a hunter has no owned target.
-static constexpr float  WG_WAR_NO_TAR_SCAN_RANGE    = 750.0f;   // Scan range for a hunter with no target at all.
-static constexpr float  WG_WAR_ALT_TAR_SCAN_RANGE   = 250.0f;   // Scan range for a hunter chasing a target it did not tag,
+static constexpr uint32 WAR_SCAN_PERIOD         = 10000u;   // Period between hunt target scans while a hunter has no owned target.
+static constexpr float  WAR_NO_TAR_SCAN_RANGE   = 750.0f;   // Scan range for a hunter with no target at all.
+static constexpr float  WAR_ALT_TAR_SCAN_RANGE  = 250.0f;   // Scan range for a hunter chasing a target it did not tag,
                                                                     // as it seeks a closer untagged target.
-static constexpr float  WG_WAR_STANDOFF_DIST        = 35.0f;    // Hunters hold this far from their target and let "wg hurl boulder" fire.
-static std::mutex                             s_WgWarTargetMtx; // Sequences hunt target tag claims/releases.
-static std::unordered_map<uint64_t, uint64_t> s_WgWarTargets;   // Tagged attacker vehicle GUID (raw) -> hunter bot GUID (raw).
+static constexpr float  WAR_STANDOFF_DIST       = 35.0f;    // Hunters hold this far from their target and let "wg hurl boulder" fire.
+static std::mutex                             s_WarTargetMtx;   // Sequences hunt target tag claims/releases.
+static std::unordered_map<uint64_t, uint64_t> s_WarTargets;     // Tagged attacker vehicle GUID (raw) -> hunter bot GUID (raw).
 
-// Battle-wide attacker vehicle snapshot shared by all hunters. Rebuilt at most once per WG_ATK_VEH_SCAN_PERIOD, by
+// Battle-wide attacker vehicle snapshot shared by all hunters. Rebuilt at most once per ATK_VEH_SCAN_PERIOD, by
 // whichever hunter reads it first after that period; every hunter reads the same list and applies its own leash range
-// (WG_WAR_*_SCAN_RANGE) to it. Stored positions are snapshot-time; a hunter chases the live target each tick, so drift
+// (WAR_*_SCAN_RANGE) to it. Stored positions are snapshot-time; a hunter chases the live target each tick, so drift
 // between scans only affects which vehicle is picked, not the chase.
 // Note that no battle end reset is needed, as each rebuild clears the list, and a new battle is realistically past the scan period.
-struct WgAttackerVehicle
+struct AttackerVehicle
 {
     ObjectGuid guid;
-    float      x, y, z;                                         // Snapshot-time position, for leash range and nearest selection.
+    float      x, y, z;                                     // Snapshot-time position, for leash range and nearest selection.
 };
-static constexpr uint32 WG_ATK_VEH_SCAN_PERIOD       = 5000u;   // Period between battle-wide attacker vehicle scans.
-static std::mutex                     s_WgAtkVehScanMtx;        // Guards the snapshot list and its timestamp.
-static uint32                         s_WgAtkVehScanTime = 0;   // getMSTime() of the last snapshot rebuild (0 = never).
-static std::vector<WgAttackerVehicle> s_WgAttackerVehicles;     // Crewed hostile mobile vehicles found by the last scan.
+static constexpr uint32 ATK_VEH_SCAN_PERIOD     = 5000u;    // Period between battle-wide attacker vehicle scans.
+static std::mutex                     s_AtkVehScanMtx;      // Guards the snapshot list and its timestamp.
+static uint32                         s_AtkVehScanTime = 0; // getMSTime() of the last snapshot rebuild (0 = never).
+static std::vector<AttackerVehicle> s_AttackerVehicles;     // Crewed hostile mobile vehicles found by the last scan.
 
-static constexpr uint8  MAX_TOWER_SQUAD             = 3;        // Max defender vehicles assigned to attack any single tower.
-static std::atomic<int32_t> s_WgTowerSquad[3]{};                // Per-tower squad counters, indexed by DEF_TOWERS[].
-static std::mutex           s_WgTowerSquadMtx;                  // Sequences tower squad assignment to prevent races on tower reassignments.
+static constexpr uint8  MAX_TOWER_SQUAD         = 3;        // Max defender vehicles assigned to attack any single tower.
+static std::atomic<int32_t> s_TowerSquad[3]{};              // Per-tower squad counters, indexed by DEF_TOWERS[].
+static std::mutex           s_TowerSquadMtx;                // Sequences tower squad assignment to prevent races on tower reassignments.
 
 // Summoning Vehicles: Don't send every eligible bot to get a vehicle. Send only an amount relative to how many
 // available vehicles there are to summon.
-static constexpr float  WS_GO_ATK_MULTIPLIER        = 1.0f;     // Multiplier for attacker bots going to summon a vehicle.
-static constexpr float  WS_GO_DEF_MULTIPLIER        = 3.0f;     // Multiplier for defender bots going to summon a vehicle.
-static std::atomic<int32_t> s_WgAtkGoingToWorkshop{0};
-static std::atomic<int32_t> s_WgDefGoingToWorkshop{0};
+static constexpr float  WS_GO_ATK_MULTIPLIER        = 1.0f; // Multiplier for attacker bots going to summon a vehicle.
+static constexpr float  WS_GO_DEF_MULTIPLIER        = 3.0f; // Multiplier for defender bots going to summon a vehicle.
+static std::atomic<int32_t> s_AtkGoingToWorkshop{0};
+static std::atomic<int32_t> s_DefGoingToWorkshop{0};
 // Tracks bots currently navigating to capture a hostile/neutral workshop.
 // Set by TryCaptureWorkshop; cleared when capture ends or WG battle resets.
-static std::mutex                   s_WgCapturingWorkshopMtx;
-static std::unordered_set<uint64_t> s_WgCapturingWorkshop;
+static std::mutex                   s_CapturingWorkshopMtx;
+static std::unordered_set<uint64_t> s_CapturingWorkshop;
 
 // Workshop Capture: percentage of infantry bots diverted to capture workshops.
 // Only the capturable workshops are considered for calculating this percentage.
-static constexpr uint8  WG_CAPTURE_PCT_HIGH           = 60;     // Team owns < 2 workshops
-static constexpr uint8  WG_CAPTURE_PCT_MID            = 40;     // Team owns 2 workshops
-static constexpr uint8  WG_CAPTURE_PCT_LOW            = 20;     // Team owns 3 workshops
-static constexpr uint8  WG_CAPTURABLE_WORKSHOP_COUNT  = 4;      // Only workshops 0-3 are capturable
+static constexpr uint8  CAPTURE_PCT_HIGH           = 60;     // Team owns < 2 workshops
+static constexpr uint8  CAPTURE_PCT_MID            = 40;     // Team owns 2 workshops
+static constexpr uint8  CAPTURE_PCT_LOW            = 20;     // Team owns 3 workshops
+static constexpr uint8  CAPTURABLE_WORKSHOP_COUNT  = 4;      // Only workshops 0-3 are capturable
 
 // Due to the map typography and the pathways, the Horde has an edge in capturing workshops. These additive modifiers to the percentage of bots
 // sent to capture workshops (capturePct) can help balance things. Keep values within range of 0 to 40.
-static constexpr int8   WG_CAP_MOD_ALLIANCE_ATK       = 15;     // capturePct modifier: Alliance attacker
-static constexpr int8   WG_CAP_MOD_ALLIANCE_DEF       = 20;     // capturePct modifier: Alliance defender
-static constexpr int8   WG_CAP_MOD_HORDE_ATK          = 0;      // capturePct modifier: Horde attacker
-static constexpr int8   WG_CAP_MOD_HORDE_DEF          = 5;      // capturePct modifier: Horde defender
+static constexpr int8   CAP_MOD_ALLIANCE_ATK       = 15;     // capturePct modifier: Alliance attacker
+static constexpr int8   CAP_MOD_ALLIANCE_DEF       = 20;     // capturePct modifier: Alliance defender
+static constexpr int8   CAP_MOD_HORDE_ATK          = 0;      // capturePct modifier: Horde attacker
+static constexpr int8   CAP_MOD_HORDE_DEF          = 5;      // capturePct modifier: Horde defender
 
 // ############# //
 // Match Balance
 // ############# //
 // WS_GO_ATK_MULTIPLIER and WS_GO_DEF_MULTIPLIER along with the four capturePct modifiers, can be tweaked to tune match balance. Here
-// "match balance" is defined such that by the end of a default 30 minute match of 120 v. 120, the result is between WG_OBJ_CENTRAL_WALL
-// having some damage, all the way to WG_OBJ_VAULT_DOOR destroyed but having no more than 5 minutes left on the timer when that happens.
+// "match balance" is defined such that by the end of a default 30 minute match of 120 v. 120, the result is between OBJ_CENTRAL_WALL
+// having some damage, all the way to OBJ_VAULT_DOOR destroyed but having no more than 5 minutes left on the timer when that happens.
 // If the any of the values need to be modified based on the current state of the code logic, make sure to run several battles and test the
 // effect of any changes. Small tweaks can have large effects on match balance.
 // TODO: Consider exposing these values as a config, with the default values being as close to match balance as possible.
@@ -231,45 +233,45 @@ static constexpr int8   WG_CAP_MOD_HORDE_DEF          = 5;      // capturePct mo
 // ####### //
 
 // Bitfield mapping for cached building destroyed states. All 8 destructible buildings fit in a single uint8.
-static constexpr uint8 WG_BLDG_FORTRESS_GATE = 1 << 0;
-static constexpr uint8 WG_BLDG_EAST_WALL     = 1 << 1;
-static constexpr uint8 WG_BLDG_WEST_WALL     = 1 << 2;
-static constexpr uint8 WG_BLDG_CENTRAL_WALL  = 1 << 3;
-static constexpr uint8 WG_BLDG_VAULT_DOOR    = 1 << 4;
-static constexpr uint8 WG_BLDG_TOWER_SE      = 1 << 5;
-static constexpr uint8 WG_BLDG_TOWER_SOUTH   = 1 << 6;
-static constexpr uint8 WG_BLDG_TOWER_SW      = 1 << 7;
+static constexpr uint8 BLDG_FORTRESS_GATE = 1 << 0;
+static constexpr uint8 BLDG_EAST_WALL     = 1 << 1;
+static constexpr uint8 BLDG_WEST_WALL     = 1 << 2;
+static constexpr uint8 BLDG_CENTRAL_WALL  = 1 << 3;
+static constexpr uint8 BLDG_VAULT_DOOR    = 1 << 4;
+static constexpr uint8 BLDG_TOWER_SE      = 1 << 5;
+static constexpr uint8 BLDG_TOWER_SOUTH   = 1 << 6;
+static constexpr uint8 BLDG_TOWER_SW      = 1 << 7;
 
-static uint8 WgWsToBit(uint32 ws)
+static uint8 WSToBit(uint32 ws)
 {
     switch (ws)
     {
-        case WG_WS_FORTRESS_GATE: return WG_BLDG_FORTRESS_GATE;
-        case WG_WS_EAST_WALL:     return WG_BLDG_EAST_WALL;
-        case WG_WS_WEST_WALL:     return WG_BLDG_WEST_WALL;
-        case WG_WS_CENTRAL_WALL:  return WG_BLDG_CENTRAL_WALL;
-        case WG_WS_VAULT_DOOR:    return WG_BLDG_VAULT_DOOR;
-        case WG_WS_TOWER_SE:      return WG_BLDG_TOWER_SE;
-        case WG_WS_TOWER_SOUTH:   return WG_BLDG_TOWER_SOUTH;
-        case WG_WS_TOWER_SW:      return WG_BLDG_TOWER_SW;
+        case WS_FORTRESS_GATE: return BLDG_FORTRESS_GATE;
+        case WS_EAST_WALL:     return BLDG_EAST_WALL;
+        case WS_WEST_WALL:     return BLDG_WEST_WALL;
+        case WS_CENTRAL_WALL:  return BLDG_CENTRAL_WALL;
+        case WS_VAULT_DOOR:    return BLDG_VAULT_DOOR;
+        case WS_TOWER_SE:      return BLDG_TOWER_SE;
+        case WS_TOWER_SOUTH:   return BLDG_TOWER_SOUTH;
+        case WS_TOWER_SW:      return BLDG_TOWER_SW;
         default:                  return 0;
     }
 }
 
 // Translates a WorldState ID to its corresponding GO entry for FindNearestGameObject calls.
 // Used by vehicle engagement logic which needs an actual GameObject* for spell targeting.
-static uint32 WgWsToGoEntry(uint32 ws)
+static uint32 WSToGoEntry(uint32 ws)
 {
     switch (ws)
     {
-        case WG_WS_FORTRESS_GATE: return 190375;
-        case WG_WS_EAST_WALL:     return 190372;
-        case WG_WS_WEST_WALL:     return 190371;
-        case WG_WS_CENTRAL_WALL:  return 191805;
-        case WG_WS_VAULT_DOOR:    return 191810;
-        case WG_WS_TOWER_SE:      return 190358;
-        case WG_WS_TOWER_SOUTH:   return 190357;
-        case WG_WS_TOWER_SW:      return 190356;
+        case WS_FORTRESS_GATE: return 190375;
+        case WS_EAST_WALL:     return 190372;
+        case WS_WEST_WALL:     return 190371;
+        case WS_CENTRAL_WALL:  return 191805;
+        case WS_VAULT_DOOR:    return 191810;
+        case WS_TOWER_SE:      return 190358;
+        case WS_TOWER_SOUTH:   return 190357;
+        case WS_TOWER_SW:      return 190356;
         default:                  return 0;
     }
 }
@@ -277,11 +279,11 @@ static uint32 WgWsToGoEntry(uint32 ws)
 // Returns true if the building with the given WorldState ID is in a destroyed state.
 // Internally caches a bitfield of all building states, refreshed at most once per second by
 // querying BattlefieldWG::IsBuildingDestroyed for each tracked WorldState.
-static bool WgIsBuildingDestroyed(BattlefieldWG* wg, uint32 worldState)
+static bool IsBuildingDestroyed(BattlefieldWG* wg, uint32 worldState)
 {
-    static constexpr uint32 WG_TRACKED_WORLDSTATES[] = {
-        WG_WS_FORTRESS_GATE, WG_WS_EAST_WALL, WG_WS_WEST_WALL,   WG_WS_CENTRAL_WALL,
-        WG_WS_VAULT_DOOR,    WG_WS_TOWER_SE,  WG_WS_TOWER_SOUTH, WG_WS_TOWER_SW,
+    static constexpr uint32 TRACKED_WORLDSTATES[] = {
+        WS_FORTRESS_GATE, WS_EAST_WALL, WS_WEST_WALL,   WS_CENTRAL_WALL,
+        WS_VAULT_DOOR,    WS_TOWER_SE,  WS_TOWER_SOUTH, WS_TOWER_SW,
     };
 
     static uint8  s_destroyedMask = 0;
@@ -293,24 +295,24 @@ static bool WgIsBuildingDestroyed(BattlefieldWG* wg, uint32 worldState)
         s_cacheTime = now;
         // Build into a local and assign once, so readers never see a partially rebuilt mask.
         uint8 mask = 0;
-        for (uint32 ws : WG_TRACKED_WORLDSTATES)
+        for (uint32 ws : TRACKED_WORLDSTATES)
             if (wg->IsBuildingDestroyed(ws))
-                mask |= WgWsToBit(ws);
+                mask |= WSToBit(ws);
         s_destroyedMask = mask;
     }
 
-    return (s_destroyedMask & WgWsToBit(worldState)) != 0;
+    return (s_destroyedMask & WSToBit(worldState)) != 0;
 }
 
-static uint32 WgFindNearestNode(float x, float y, float z)
+static uint32 FindNearestNode(float x, float y, float z)
 {
     uint32 best   = 0;
     float  bestD2 = std::numeric_limits<float>::max();
-    for (uint32 i = 0; i < static_cast<uint32>(g_WgGraph.size()); ++i)
+    for (uint32 i = 0; i < static_cast<uint32>(g_Graph.size()); ++i)
     {
-        float dx = g_WgGraph[i].x - x;
-        float dy = g_WgGraph[i].y - y;
-        float dz = g_WgGraph[i].z - z;
+        float dx = g_Graph[i].x - x;
+        float dy = g_Graph[i].y - y;
+        float dz = g_Graph[i].z - z;
         float d2 = dx*dx + dy*dy + dz*dz;
         if (d2 < bestD2)
         {
@@ -324,12 +326,12 @@ static uint32 WgFindNearestNode(float x, float y, float z)
 // Returns an ordered list of graph node indices from start to goal using A*.
 // wg = nullptr skips wall checks. isVehicle = true skips infantry-only nodes. bot != nullptr applies per-bot
 // aura blocks (edges with blockAura set). Returns empty if no path exists.
-static std::vector<uint32> WgAStarPath(uint32 start, uint32 goal, BattlefieldWG* wg = nullptr, bool isVehicle = false, Player* bot = nullptr)
+static std::vector<uint32> AStarPath(uint32 start, uint32 goal, BattlefieldWG* wg = nullptr, bool isVehicle = false, Player* bot = nullptr)
 {
     if (start == goal)
         return {};
 
-    uint32 const N = static_cast<uint32>(g_WgGraph.size());
+    uint32 const N = static_cast<uint32>(g_Graph.size());
     thread_local std::vector<float>  gCost;
     thread_local std::vector<uint32> parent;
     thread_local std::vector<bool>   closed;
@@ -339,9 +341,9 @@ static std::vector<uint32> WgAStarPath(uint32 start, uint32 goal, BattlefieldWG*
 
     auto heuristic = [&](uint32 node) -> float
     {
-        float dx = g_WgGraph[node].x - g_WgGraph[goal].x;
-        float dy = g_WgGraph[node].y - g_WgGraph[goal].y;
-        float dz = g_WgGraph[node].z - g_WgGraph[goal].z;
+        float dx = g_Graph[node].x - g_Graph[goal].x;
+        float dy = g_Graph[node].y - g_Graph[goal].y;
+        float dz = g_Graph[node].z - g_Graph[goal].z;
         return std::sqrt(dx*dx + dy*dy + dz*dz);
     };
 
@@ -369,28 +371,28 @@ static std::vector<uint32> WgAStarPath(uint32 start, uint32 goal, BattlefieldWG*
             return path;
         }
 
-        for (WgEdge const& e : g_WgGraph[cur].adj)
+        for (Edge const& e : g_Graph[cur].adj)
         {
             if (closed[e.target])
                 continue;
-            if (isVehicle && g_WgGraph[e.target].noVehicle)
+            if (isVehicle && g_Graph[e.target].noVehicle)
                 continue;
-            if (wg && e.blockWorldState && !WgIsBuildingDestroyed(wg, e.blockWorldState))
+            if (wg && e.blockWorldState && !IsBuildingDestroyed(wg, e.blockWorldState))
                 continue;
             // Walls appear in the graph in two ways: as junction edges (caught by the check above) and as a pathBlock on
             // the wall's own waypoint. A* only inspects edge blocks, not a node's pathBlock, so it would route a vehivle
-            // straight through a standing wall node. FollowWgRoute then halts at that node, which can cause a vehicle to
+            // straight through a standing wall node. FollowRoute then halts at that node, which can cause a vehicle to
             // get stuck within the wall. So treat a standing wall node as impassable to vehicles while it's only an
             // intermediate step. Allow it as the goal though, so attacker vehicles can reach a standing wall to attack it.
 
-            if (isVehicle && wg && e.target != goal && g_WgGraph[e.target].pathBlock &&
-                !WgIsBuildingDestroyed(wg, g_WgGraph[e.target].pathBlock))
+            if (isVehicle && wg && e.target != goal && g_Graph[e.target].pathBlock &&
+                !IsBuildingDestroyed(wg, g_Graph[e.target].pathBlock))
                 continue;
             if (e.blockAura && bot && bot->HasAura(e.blockAura))
                 continue;
-            float dx    = g_WgGraph[e.target].x - g_WgGraph[cur].x;
-            float dy    = g_WgGraph[e.target].y - g_WgGraph[cur].y;
-            float dz    = g_WgGraph[e.target].z - g_WgGraph[cur].z;
+            float dx    = g_Graph[e.target].x - g_Graph[cur].x;
+            float dy    = g_Graph[e.target].y - g_Graph[cur].y;
+            float dz    = g_Graph[e.target].z - g_Graph[cur].z;
             float tentG = gCost[cur] + std::sqrt(dx*dx + dy*dy + dz*dz);
             if (tentG < gCost[e.target])
             {
@@ -410,33 +412,33 @@ static BattlefieldWG* GetBattlefieldWG()
 }
 
 // Returns true if the bot can reach a point through A* pathing, or if the nearest node to the bot is the nearest node to
-// the point (meaning the bot is essentially at the point, which also makes WgAStarPath return an empty path).
-static bool WgCanReach(Player* bot, Position const& goal, BattlefieldWG* wg)
+// the point (meaning the bot is essentially at the point, which also makes AStarPath return an empty path).
+static bool CanReach(Player* bot, Position const& goal, BattlefieldWG* wg)
 {
-    uint32 startNode = WgFindNearestNode(bot->GetPositionX(), bot->GetPositionY(), bot->GetPositionZ());
-    uint32 goalNode  = WgFindNearestNode(goal.GetPositionX(), goal.GetPositionY(), goal.GetPositionZ());
-    return !WgAStarPath(startNode, goalNode, wg).empty() || startNode == goalNode;
+    uint32 startNode = FindNearestNode(bot->GetPositionX(), bot->GetPositionY(), bot->GetPositionZ());
+    uint32 goalNode  = FindNearestNode(goal.GetPositionX(), goal.GetPositionY(), goal.GetPositionZ());
+    return !AStarPath(startNode, goalNode, wg).empty() || startNode == goalNode;
 }
 
 // Counts the capturable workshops (0-3, excludes fortress workshops 4-5) owned by the given team.
-static uint8 WgCountCapturedWorkshops(BattlefieldWG* wg, TeamId team)
+static uint8 CountCapturedWorkshops(BattlefieldWG* wg, TeamId team)
 {
     uint8 count = 0;
-    for (uint8 i = 0; i < WG_CAPTURABLE_WORKSHOP_COUNT; ++i)
-        if (wg->GetWorkshopTeam(WG_WORKSHOPS[i].workshopId) == team)
+    for (uint8 i = 0; i < CAPTURABLE_WORKSHOP_COUNT; ++i)
+        if (wg->GetWorkshopTeam(WORKSHOPS[i].workshopId) == team)
             ++count;
     return count;
 }
 
 // Assigns a capturable workshop (indices 0-3 only) not owned by the giventeam, distributed by bot GUID.
-// Returns the WG_WORKSHOPS[] index, or 0xFF if none found.
-static uint8 WgPickCapturableWorkshop(BattlefieldWG* wg, Player* bot, TeamId team)
+// Returns the WORKSHOPS[] index, or 0xFF if none found.
+static uint8 PickCapturableWorkshop(BattlefieldWG* wg, Player* bot, TeamId team)
 {
-    uint8 candidates[WG_CAPTURABLE_WORKSHOP_COUNT];
+    uint8 candidates[CAPTURABLE_WORKSHOP_COUNT];
     uint8 count = 0;
-    for (uint8 i = 0; i < WG_CAPTURABLE_WORKSHOP_COUNT; ++i)
+    for (uint8 i = 0; i < CAPTURABLE_WORKSHOP_COUNT; ++i)
     {
-        if (wg->GetWorkshopTeam(WG_WORKSHOPS[i].workshopId) == team)
+        if (wg->GetWorkshopTeam(WORKSHOPS[i].workshopId) == team)
             continue;
         candidates[count++] = i;
     }
@@ -445,55 +447,55 @@ static uint8 WgPickCapturableWorkshop(BattlefieldWG* wg, Player* bot, TeamId tea
     return candidates[bot->GetGUID().GetCounter() % count];
 }
 
-static uint32 const WG_FIXED_VEHICLE_ENTRIES[] = {
+static uint32 const FIXED_VEHICLE_ENTRIES[] = {
     NPC_WINTERGRASP_TOWER_CANNON,
     NPC_WINTERGRASP_SIEGE_ENGINE_TURRET_ALLIANCE,
     NPC_WINTERGRASP_SIEGE_ENGINE_TURRET_HORDE,
 };
 
-static uint32 const WG_MOBILE_VEHICLE_ENTRIES[] = {
+static uint32 const MOBILE_VEHICLE_ENTRIES[] = {
     NPC_WINTERGRASP_CATAPULT,
     NPC_WINTERGRASP_DEMOLISHER,
     NPC_WINTERGRASP_SIEGE_ENGINE_ALLIANCE,
     NPC_WINTERGRASP_SIEGE_ENGINE_HORDE,
 };
 
-// hisGuardAtWar tag map helpers. A hunter "tags" the attacker vehicle (WG_MOBILE_VEHICLE_ENTRIES only) it is
+// hisGuardAtWar tag map helpers. A hunter "tags" the attacker vehicle (MOBILE_VEHICLE_ENTRIES only) it is
 // going after so other hunters prefer untagged targets when any are within scanRange.
 // Tags release on target death/despawn, hunter vehicle loss, or battle end.
-static uint64_t WgVehicleTaggedBy(uint64_t vehicleRaw)
+static uint64_t VehicleTaggedBy(uint64_t vehicleRaw)
 {
-    std::lock_guard<std::mutex> lock(s_WgWarTargetMtx);
-    auto it = s_WgWarTargets.find(vehicleRaw);
-    return it != s_WgWarTargets.end() ? it->second : 0;
+    std::lock_guard<std::mutex> lock(s_WarTargetMtx);
+    auto it = s_WarTargets.find(vehicleRaw);
+    return it != s_WarTargets.end() ? it->second : 0;
 }
-static bool WgTryTagVehicle(uint64_t vehicleRaw, uint64_t botRaw)
+static bool TryTagVehicle(uint64_t vehicleRaw, uint64_t botRaw)
 {
-    std::lock_guard<std::mutex> lock(s_WgWarTargetMtx);
-    return s_WgWarTargets.emplace(vehicleRaw, botRaw).second;
+    std::lock_guard<std::mutex> lock(s_WarTargetMtx);
+    return s_WarTargets.emplace(vehicleRaw, botRaw).second;
 }
-static void WgReleaseVehicleTag(uint64_t vehicleRaw, uint64_t botRaw)
+static void ReleaseVehicleTag(uint64_t vehicleRaw, uint64_t botRaw)
 {
-    std::lock_guard<std::mutex> lock(s_WgWarTargetMtx);
-    auto it = s_WgWarTargets.find(vehicleRaw);
-    if (it != s_WgWarTargets.end() && it->second == botRaw)
-        s_WgWarTargets.erase(it);
+    std::lock_guard<std::mutex> lock(s_WarTargetMtx);
+    auto it = s_WarTargets.find(vehicleRaw);
+    if (it != s_WarTargets.end() && it->second == botRaw)
+        s_WarTargets.erase(it);
 }
-// Instead of having s_WgWarTargetMtx locked and unlocked as each individual candidate vehicle in the
+// Instead of having s_WarTargetMtx locked and unlocked as each individual candidate vehicle in the
 // scan is checked to see whether it has a tag or not, the tagged attacker vehicle GUIDs are copied
 // under a single lock. Then, an untagged-only scan can test each candidate against the copy, lock-free.
-static std::unordered_set<uint64_t> WgSnapshotTaggedVehicles()
+static std::unordered_set<uint64_t> SnapshotTaggedVehicles()
 {
-    std::lock_guard<std::mutex> lock(s_WgWarTargetMtx);
+    std::lock_guard<std::mutex> lock(s_WarTargetMtx);
     std::unordered_set<uint64_t> tagged;
-    tagged.reserve(s_WgWarTargets.size());
-    for (auto const& kv : s_WgWarTargets)
+    tagged.reserve(s_WarTargets.size());
+    for (auto const& kv : s_WarTargets)
         tagged.insert(kv.first);
     return tagged;
 }
 
 template <std::size_t N>
-static bool WgIsEntryIn(uint32 const (&entries)[N], uint32 entry)
+static bool IsEntryIn(uint32 const (&entries)[N], uint32 entry)
 {
     for (uint32 e : entries)
         if (e == entry)
@@ -501,8 +503,8 @@ static bool WgIsEntryIn(uint32 const (&entries)[N], uint32 entry)
     return false;
 }
 
-// Match filter parameters for WgFindNearestVehicle.
-struct WgVehicleCheck
+// Match filter parameters for FindNearestVehicle.
+struct VehicleCheck
 {
     Player*    bot;
     float      range;           // Handles proximity, scan range, or whatever range the bot vehicle is concerned with.
@@ -513,8 +515,8 @@ struct WgVehicleCheck
     bool operator()(Creature* c) const
     {
         uint32 entry = c->GetEntry();
-        if (!WgIsEntryIn(WG_MOBILE_VEHICLE_ENTRIES, entry) &&
-            !(includeFixed && WgIsEntryIn(WG_FIXED_VEHICLE_ENTRIES, entry)))
+        if (!IsEntryIn(MOBILE_VEHICLE_ENTRIES, entry) &&
+            !(includeFixed && IsEntryIn(FIXED_VEHICLE_ENTRIES, entry)))
             return false;
         if (!c->IsAlive() || bot->IsHostileTo(c) != wantHostile)
             return false;
@@ -528,12 +530,12 @@ struct WgVehicleCheck
 };
 
 // Returns the nearest vehicle matching check within range. The named finders below wrap this.
-static Creature* WgFindNearestVehicle(Player* bot, float range, bool includeFixed, bool wantHostile,
+static Creature* FindNearestVehicle(Player* bot, float range, bool includeFixed, bool wantHostile,
                                       ObjectGuid ignore = ObjectGuid::Empty)
 {
     std::list<Creature*> found;
-    WgVehicleCheck check{bot, range, includeFixed, wantHostile, ignore};
-    Acore::CreatureListSearcher<WgVehicleCheck> searcher(bot, found, check);
+    VehicleCheck check{bot, range, includeFixed, wantHostile, ignore};
+    Acore::CreatureListSearcher<VehicleCheck> searcher(bot, found, check);
     Cell::VisitObjects(bot, searcher, range);
 
     Creature* nearest = nullptr;
@@ -552,32 +554,32 @@ static Creature* WgFindNearestVehicle(Player* bot, float range, bool includeFixe
 
 // Find the nearest mounted hostile vehicle (fixed or mobile) within scanRange yards.
 // Used by fixed cannons, siege turrets, and by the demolisher boulder attack.
-static Creature* WgFindNearestHostileVehicle(Player* bot, float scanRange)
+static Creature* FindNearestHostileVehicle(Player* bot, float scanRange)
 {
-    return WgFindNearestVehicle(bot, scanRange, /*includeFixed*/ true, /*wantHostile*/ true);
+    return FindNearestVehicle(bot, scanRange, /*includeFixed*/ true, /*wantHostile*/ true);
 }
 
 // Find the nearest mounted friendly mobile vehicle within scanRange yards, ignoring the bot's own vehicle.
 // Used by defender vehicles to disperse their guarding positions slightly away from each other.
-static Creature* WgFindNearestFriendlyVehicle(Player* bot, float scanRange)
+static Creature* FindNearestFriendlyVehicle(Player* bot, float scanRange)
 {
     ObjectGuid ownBase = bot->GetVehicle() && bot->GetVehicle()->GetBase()
         ? bot->GetVehicle()->GetBase()->GetGUID() : ObjectGuid::Empty;
-    return WgFindNearestVehicle(bot, scanRange, /*includeFixed*/ false, /*wantHostile*/ false, ownBase);
+    return FindNearestVehicle(bot, scanRange, /*includeFixed*/ false, /*wantHostile*/ false, ownBase);
 }
 
-// Rebuilds the shared attacker vehicle snapshot once it is older than WG_ATK_VEH_SCAN_PERIOD. Every siege vehicle is
+// Rebuilds the shared attacker vehicle snapshot once it is older than ATK_VEH_SCAN_PERIOD. Every siege vehicle is
 // player-driven, and driving one requires being in the war, so every attacker vehicle is found by checking which
 // players in the attacker team's PlayersInWar set are driving one.
-static void WgRefreshAttackerVehiclesIfStale(Player* anchorBot, BattlefieldWG* wg)
+static void RefreshAttackerVehiclesIfStale(Player* anchorBot, BattlefieldWG* wg)
 {
-    std::lock_guard<std::mutex> lock(s_WgAtkVehScanMtx);
+    std::lock_guard<std::mutex> lock(s_AtkVehScanMtx);
     uint32 now = getMSTime();
-    if (s_WgAtkVehScanTime != 0 && now - s_WgAtkVehScanTime < WG_ATK_VEH_SCAN_PERIOD)
+    if (s_AtkVehScanTime != 0 && now - s_AtkVehScanTime < ATK_VEH_SCAN_PERIOD)
         return;
-    s_WgAtkVehScanTime = now;
+    s_AtkVehScanTime = now;
 
-    s_WgAttackerVehicles.clear();
+    s_AttackerVehicles.clear();
     for (ObjectGuid const& guid : wg->GetPlayersInWarSet(wg->GetAttackerTeam()))
     {
         Player* p = ObjectAccessor::FindPlayer(guid);
@@ -585,7 +587,7 @@ static void WgRefreshAttackerVehiclesIfStale(Player* anchorBot, BattlefieldWG* w
             continue;
         Unit* base = p->GetVehicleBase();
         Creature* c = base ? base->ToCreature() : nullptr;
-        if (!c || !WgIsEntryIn(WG_MOBILE_VEHICLE_ENTRIES, c->GetEntry()))
+        if (!c || !IsEntryIn(MOBILE_VEHICLE_ENTRIES, c->GetEntry()))
             continue;
         // Record each vehicle once, through its seat-0 driver, and only while it is a live enemy.
         Vehicle* vKit = c->GetVehicleKit();
@@ -593,7 +595,7 @@ static void WgRefreshAttackerVehiclesIfStale(Player* anchorBot, BattlefieldWG* w
             continue;
         if (!c->IsAlive() || !anchorBot->IsHostileTo(c))    // anchorBot is any defender. Used only as the hostility reference.
             continue;
-        s_WgAttackerVehicles.push_back({ c->GetGUID(), c->GetPositionX(), c->GetPositionY(), c->GetPositionZ() });
+        s_AttackerVehicles.push_back({ c->GetGUID(), c->GetPositionX(), c->GetPositionY(), c->GetPositionZ() });
     }
 }
 
@@ -612,7 +614,7 @@ static void WgRefreshAttackerVehiclesIfStale(Player* anchorBot, BattlefieldWG* w
 // per standing tower, in a sweep proximity order. The excess number of vehicles scan for and actively hunt attacker vehicles. If there's no
 // more needed vehicles to attack the towers, they fall back to any needed stationary guard slots at the fortress, or go on the hunt.
 //
-// All navigation flows through FollowWgRoute, which uses the A* graph to produce waypoint-by-waypoint movement with look-ahead logic,
+// All navigation flows through FollowRoute, which uses the A* graph to produce waypoint-by-waypoint movement with look-ahead logic,
 // wall-blocking awareness, jitter to avoid duplicate-move suppression, and a plethora of path junction-based rules.
 // ######################################################################################################################################### //
 WgCheckFlagAction::~WgCheckFlagAction()
@@ -621,44 +623,44 @@ WgCheckFlagAction::~WgCheckFlagAction()
 }
 
 // Releases the bot's claims on shared trackers: the workshop-goer, fort guard, and tower squad counters,
-// plus the bot's s_WgCapturingWorkshop entry. If there are bot pointers to clear, they belong in ResetBattleState,
+// plus the bot's s_CapturingWorkshop entry. If there are bot pointers to clear, they belong in ResetBattleState,
 // never here, as the destructor calls ClearSharedTracking when the bot may already be deleted.
 void WgCheckFlagAction::ClearSharedTracking()
 {
     if (m_atkGoingToWorkshop)
     {
         m_atkGoingToWorkshop = false;
-        --s_WgAtkGoingToWorkshop;
+        --s_AtkGoingToWorkshop;
     }
     if (m_defGoingToWorkshop)
     {
         m_defGoingToWorkshop = false;
-        --s_WgDefGoingToWorkshop;
+        --s_DefGoingToWorkshop;
     }
     if (m_defGuardFortress == 1)
-        --s_WgFortGuardAtStage;
+        --s_FortGuardAtStage;
     else if (m_defGuardFortress == 2)
-        --s_WgFortGuardAtGate;
+        --s_FortGuardAtGate;
     else if (m_defGuardFortress == 3)
     {
-        --s_WgGuardAtWar;
+        --s_GuardAtWar;
         if (m_warTarget)
-            WgReleaseVehicleTag(m_warTarget.GetRawValue(), m_botGuidRaw);
+            ReleaseVehicleTag(m_warTarget.GetRawValue(), m_botGuidRaw);
     }
     else if (m_defGuardFortress == 4)
-        --s_WgGuardAtCourt;
+        --s_GuardAtCourt;
     m_defGuardFortress = 0;
     m_warTarget.Clear();
     if (m_isTowerAttacker)
     {
         m_isTowerAttacker = false;
-        --s_WgTowerSquad[m_targetTowerIdx];
+        --s_TowerSquad[m_targetTowerIdx];
     }
     m_targetTowerIdx   = 0xFF;
     if (m_botGuidRaw)
     {
-        std::lock_guard<std::mutex> lock(s_WgCapturingWorkshopMtx);
-        s_WgCapturingWorkshop.erase(m_botGuidRaw);
+        std::lock_guard<std::mutex> lock(s_CapturingWorkshopMtx);
+        s_CapturingWorkshop.erase(m_botGuidRaw);
     }
 }
 
@@ -687,12 +689,12 @@ bool WgCheckFlagAction::TryCaptureWorkshop(BattlefieldWG* wg)
     if (m_captureWsIdx != 0xFF)
     {
         // The team captured the target: release. A fresh roll may hand out a new assignment next tick.
-        if (wg->GetWorkshopTeam(WG_WORKSHOPS[m_captureWsIdx].workshopId) == team)
+        if (wg->GetWorkshopTeam(WORKSHOPS[m_captureWsIdx].workshopId) == team)
         {
             m_captureWsIdx     = 0xFF;
             m_arrivedAtCapture = false;
-            std::lock_guard<std::mutex> lock(s_WgCapturingWorkshopMtx);
-            s_WgCapturingWorkshop.erase(m_botGuidRaw);
+            std::lock_guard<std::mutex> lock(s_CapturingWorkshopMtx);
+            s_CapturingWorkshop.erase(m_botGuidRaw);
             return false;
         }
 
@@ -706,44 +708,44 @@ bool WgCheckFlagAction::TryCaptureWorkshop(BattlefieldWG* wg)
                 return false;
 
             // Not fighting: navigate back if displaced. Block lower-priority routing.
-            WgPath const& wsPath = *WG_WORKSHOPS[m_captureWsIdx].path;
+            Path const& wsPath = *WORKSHOPS[m_captureWsIdx].path;
             Position const pos(wsPath[0].x, wsPath[0].y, wsPath[0].z, 0.0f);
-            FollowWgRoute(pos, false);
+            FollowRoute(pos, false);
             return true;
         }
     }
     else
     {
-        uint8 ownedCount = WgCountCapturedWorkshops(wg, team);
+        uint8 ownedCount = CountCapturedWorkshops(wg, team);
         uint8 capturePct = 0;
         if (ownedCount < 2)
-            capturePct = WG_CAPTURE_PCT_HIGH;
+            capturePct = CAPTURE_PCT_HIGH;
         else if (ownedCount == 2)
-            capturePct = WG_CAPTURE_PCT_MID;
+            capturePct = CAPTURE_PCT_MID;
         else if (ownedCount == 3)
-            capturePct = WG_CAPTURE_PCT_LOW;
+            capturePct = CAPTURE_PCT_LOW;
 
         // Add capture percentage modifier, depending on faction, and faction role as attacker/defender.
         bool isAttacker = (team != wg->GetDefenderTeam());
         if (team == TEAM_ALLIANCE)
-            capturePct += isAttacker ? WG_CAP_MOD_ALLIANCE_ATK : WG_CAP_MOD_ALLIANCE_DEF;
+            capturePct += isAttacker ? CAP_MOD_ALLIANCE_ATK : CAP_MOD_ALLIANCE_DEF;
         else
-            capturePct += isAttacker ? WG_CAP_MOD_HORDE_ATK : WG_CAP_MOD_HORDE_DEF;
+            capturePct += isAttacker ? CAP_MOD_HORDE_ATK : CAP_MOD_HORDE_DEF;
 
         // Not rolled into capture duty: let main routing handle this bot.
         if (capturePct == 0 ||
             static_cast<uint8>(bot->GetGUID().GetCounter() % 100) >= capturePct)
         {
-            std::lock_guard<std::mutex> lock(s_WgCapturingWorkshopMtx);
-            s_WgCapturingWorkshop.erase(m_botGuidRaw);
+            std::lock_guard<std::mutex> lock(s_CapturingWorkshopMtx);
+            s_CapturingWorkshop.erase(m_botGuidRaw);
             return false;
         }
 
-        uint8 wsIdx = WgPickCapturableWorkshop(wg, bot, team);
+        uint8 wsIdx = PickCapturableWorkshop(wg, bot, team);
         if (wsIdx == 0xFF)
         {
-            std::lock_guard<std::mutex> lock(s_WgCapturingWorkshopMtx);
-            s_WgCapturingWorkshop.erase(m_botGuidRaw);
+            std::lock_guard<std::mutex> lock(s_CapturingWorkshopMtx);
+            s_CapturingWorkshop.erase(m_botGuidRaw);
             return false;
         }
 
@@ -751,27 +753,27 @@ bool WgCheckFlagAction::TryCaptureWorkshop(BattlefieldWG* wg)
     }
 
     // Heading to the assigned workshop.
-    WgPath const& wsPath = *WG_WORKSHOPS[m_captureWsIdx].path;
+    Path const& wsPath = *WORKSHOPS[m_captureWsIdx].path;
     Position const pos(wsPath[0].x, wsPath[0].y, wsPath[0].z, 0.0f);
 
-    // Set the latch when within the workshop combat zone. Here WG_WORKSHOP_ARRIVE_DIST is used instead of the standard
-    // WG_OBJ_ARRIVE_DIST, so combat suppression lifts at a larger distance before the bot arrives to the workshop.
+    // Set the latch when within the workshop combat zone. Here WORKSHOP_ARRIVE_DIST is used instead of the standard
+    // OBJ_ARRIVE_DIST, so combat suppression lifts at a larger distance before the bot arrives to the workshop.
     if (!m_arrivedAtCapture &&
-        bot->GetDistance(pos.GetPositionX(), pos.GetPositionY(), pos.GetPositionZ()) < WG_WORKSHOP_ARRIVE_DIST)
+        bot->GetDistance(pos.GetPositionX(), pos.GetPositionY(), pos.GetPositionZ()) < WORKSHOP_ARRIVE_DIST)
         m_arrivedAtCapture = true;
 
-    // Keep navigating toward the workshop waypoint until FollowWgRoute says arrived.
+    // Keep navigating toward the workshop waypoint until FollowRoute says arrived.
     if (!m_arrivedAtCapture)
-        FollowWgRoute(pos, false);
+        FollowRoute(pos, false);
 
     // Track bots going to capture workshops so other actions can suppress combat while navigating.
     // Remove from tracking once latched (arrived at workshop).
     {
-        std::lock_guard<std::mutex> lock(s_WgCapturingWorkshopMtx);
+        std::lock_guard<std::mutex> lock(s_CapturingWorkshopMtx);
         if (!m_arrivedAtCapture)
-            s_WgCapturingWorkshop.insert(m_botGuidRaw);
+            s_CapturingWorkshop.insert(m_botGuidRaw);
         else
-            s_WgCapturingWorkshop.erase(m_botGuidRaw);
+            s_CapturingWorkshop.erase(m_botGuidRaw);
     }
     return true;   // Always true: main routing never fires as long as the bot is on a capture assignment.
 }
@@ -785,21 +787,21 @@ bool WgCheckFlagAction::IsCapturingWorkshop(Player* bot)
     if (!bot || !bot->InBattlefield() || !bot->HasAura(SPELL_LIEUTENANT))
         return false;
 
-    std::lock_guard<std::mutex> lock(s_WgCapturingWorkshopMtx);
-    return s_WgCapturingWorkshop.count(bot->GetGUID().GetRawValue()) > 0;
+    std::lock_guard<std::mutex> lock(s_CapturingWorkshopMtx);
+    return s_CapturingWorkshop.count(bot->GetGUID().GetRawValue()) > 0;
 }
 
 // A defender vehicle that found no tower to attack falls back to a fortress guard slot, or to hunt attacker vehicles
 // (hisGuardAtWar) when the guard positions are full. Mutex locked so concurrent fallbacks can't overshoot a cap.
 void WgCheckFlagAction::FallBackToGuardOrWar(bool whenTheWallsFell)
 {
-    std::lock_guard<std::mutex> lock(s_WgFortGuardPosMtx);
+    std::lock_guard<std::mutex> lock(s_FortGuardPosMtx);
     if (!whenTheWallsFell)
     {
         // Pre-breach: top up the smaller of hisGuardAtWall/hisGuardAtGate toward VEHICLE_FORT_GUARD_MAX and overflow hunts.
-        bool stageIsPreferred = (s_WgFortGuardAtStage <= s_WgFortGuardAtGate);
-        std::atomic<int32_t>& countPreferred = stageIsPreferred ? s_WgFortGuardAtStage : s_WgFortGuardAtGate;
-        std::atomic<int32_t>& countFallback  = stageIsPreferred ? s_WgFortGuardAtGate : s_WgFortGuardAtStage;
+        bool stageIsPreferred = (s_FortGuardAtStage <= s_FortGuardAtGate);
+        std::atomic<int32_t>& countPreferred = stageIsPreferred ? s_FortGuardAtStage : s_FortGuardAtGate;
+        std::atomic<int32_t>& countFallback  = stageIsPreferred ? s_FortGuardAtGate : s_FortGuardAtStage;
         uint8 slotPreferred = stageIsPreferred ? 1 : 2;
         uint8 slotFallback  = stageIsPreferred ? 2 : 1;
         if (countPreferred < VEHICLE_FORT_GUARD_MAX)
@@ -815,21 +817,21 @@ void WgCheckFlagAction::FallBackToGuardOrWar(bool whenTheWallsFell)
         else
         {
             m_defGuardFortress = 3;
-            ++s_WgGuardAtWar;
+            ++s_GuardAtWar;
         }
     }
     else
     {
         // Post-breach: hold the court up to VEHICLE_COURT_GUARD and overflow hunts.
-        if (s_WgGuardAtCourt < VEHICLE_COURT_GUARD)
+        if (s_GuardAtCourt < VEHICLE_COURT_GUARD)
         {
             m_defGuardFortress = 4;
-            ++s_WgGuardAtCourt;
+            ++s_GuardAtCourt;
         }
         else
         {
             m_defGuardFortress = 3;
-            ++s_WgGuardAtWar;
+            ++s_GuardAtWar;
         }
     }
     m_defGuardFortressTime = getMSTime();
@@ -845,34 +847,34 @@ Creature* WgCheckFlagAction::AcquireWarTarget()
         target = nullptr;
     if (!target && m_warTarget)
     {
-        WgReleaseVehicleTag(m_warTarget.GetRawValue(), m_botGuidRaw);
+        ReleaseVehicleTag(m_warTarget.GetRawValue(), m_botGuidRaw);
         m_warTarget.Clear();
     }
 
     // If a hunter has a target, and it was the first to find it (ownTag) it should keep it; otherwise rescan, no more
-    // than once per WG_WAR_SCAN_PERIOD.
-    bool ownTag = target && WgVehicleTaggedBy(m_warTarget.GetRawValue()) == m_botGuidRaw;
+    // than once per WAR_SCAN_PERIOD.
+    bool ownTag = target && VehicleTaggedBy(m_warTarget.GetRawValue()) == m_botGuidRaw;
     uint32 now = getMSTime();
-    if ((target && ownTag) || now - m_warScanTime < WG_WAR_SCAN_PERIOD)
+    if ((target && ownTag) || now - m_warScanTime < WAR_SCAN_PERIOD)
         return target;
     m_warScanTime = now;
 
     // Take local copies of the shared attacker vehicle snapshot and of the tag map, so the candidate for loop below runs
     // without holding either lock.
     if (BattlefieldWG* wg = GetBattlefieldWG())
-        WgRefreshAttackerVehiclesIfStale(bot, wg);
-    std::vector<WgAttackerVehicle> candidates;
+        RefreshAttackerVehiclesIfStale(bot, wg);
+    std::vector<AttackerVehicle> candidates;
     {
-        std::lock_guard<std::mutex> lock(s_WgAtkVehScanMtx);
-        candidates = s_WgAttackerVehicles;
+        std::lock_guard<std::mutex> lock(s_AtkVehScanMtx);
+        candidates = s_AttackerVehicles;
     }
-    std::unordered_set<uint64_t> tagged = WgSnapshotTaggedVehicles();
+    std::unordered_set<uint64_t> tagged = SnapshotTaggedVehicles();
 
     // Range for target lookup in `candidates`, depending on whether the hunter has no target, or has one it doesn't own (!ownTag).
-    float untaggedRange = target ? WG_WAR_ALT_TAR_SCAN_RANGE : WG_WAR_NO_TAR_SCAN_RANGE;
+    float untaggedRange = target ? WAR_ALT_TAR_SCAN_RANGE : WAR_NO_TAR_SCAN_RANGE;
     ObjectGuid nearestUntagged; float nearestUntaggedDist = untaggedRange;
-    ObjectGuid nearestAny;      float nearestAnyDist      = WG_WAR_NO_TAR_SCAN_RANGE;
-    for (WgAttackerVehicle const& cand : candidates)
+    ObjectGuid nearestAny;      float nearestAnyDist      = WAR_NO_TAR_SCAN_RANGE;
+    for (AttackerVehicle const& cand : candidates)
     {
         float dist = bot->GetDistance(cand.x, cand.y, cand.z);
         if (dist < nearestAnyDist)
@@ -890,14 +892,14 @@ Creature* WgCheckFlagAction::AcquireWarTarget()
     // Claim the nearest untagged vehicle and chase it; a successful tag means no other hunter owns it. A hunter that
     // claims nothing keeps the target it has, rather than swapping one unowned target for another that is only nearer.
     // Only with no claim and no current target does a hunter fall back to the nearest already-tagged vehicle.
-    if (nearestUntagged && WgTryTagVehicle(nearestUntagged.GetRawValue(), m_botGuidRaw))
+    if (nearestUntagged && TryTagVehicle(nearestUntagged.GetRawValue(), m_botGuidRaw))
     {
         if (Creature* c = bot->GetMap()->GetCreature(nearestUntagged))
         {
             m_warTarget = nearestUntagged;
             return c;
         }
-        WgReleaseVehicleTag(nearestUntagged.GetRawValue(), m_botGuidRaw);   // Vanished between the snapshot and the claim.
+        ReleaseVehicleTag(nearestUntagged.GetRawValue(), m_botGuidRaw);   // Vanished between the snapshot and the claim.
     }
     if (target)
         return target;
@@ -914,7 +916,7 @@ Creature* WgCheckFlagAction::AcquireWarTarget()
 
 // Fire all applicable vehicle spells at a destructible building GO.
 // Sets "bg siege" position internally so CastVehicleSpell targets the GO. Returns true if any spell was cast.
-static bool WgVehicleFireSpells(PlayerbotAI* botAI, Creature* creature,
+static bool VehicleFireSpells(PlayerbotAI* botAI, Creature* creature,
                                 Unit* vehicleBase, GameObject* go,
                                 float dist, float rangedDist, bool inMelee)
 {
@@ -960,21 +962,21 @@ static bool WgVehicleFireSpells(PlayerbotAI* botAI, Creature* creature,
 }
 
 // ######################################################################################################################################### //
-// FollowWgRoute is the main navigation function. It routes the bot to its objective using the A* waypoint graph. Several pathing systems
+// FollowRoute is the main navigation function. It routes the bot to its objective using the A* waypoint graph. Several pathing systems
 // were tested for Wintergrasp. Wintergrasp battles can have hundreds of PVP players at a time, many objectives to capture and interact with,
 // and paths that need to be blocked as mmaps doesn't work correctly with bot pathing and destructible structures (bots can walk through them
 // like they're not there). Given all that, A* was the most reliable pathing system.
-// FollowWgRoute is used by the function Execute to determine how to get to Execute's objectives.
+// FollowRoute is used by the function Execute to determine how to get to Execute's objectives.
 // ######################################################################################################################################### //
-bool WgCheckFlagAction::FollowWgRoute(Position const& objective, bool checkPathBlock)
+bool WgCheckFlagAction::FollowRoute(Position const& objective, bool checkPathBlock)
 {
-    BuildWgGraph();
+    BuildGraph();
 
     BattlefieldWG* wg = GetBattlefieldWG();
     if (!wg)
         return false;
 
-    uint32 goalNode = WgFindNearestNode(
+    uint32 goalNode = FindNearestNode(
         objective.GetPositionX(), objective.GetPositionY(), objective.GetPositionZ());
 
     // Kiteo, his eyes closed: The bot's pathing data is stale.
@@ -985,7 +987,7 @@ bool WgCheckFlagAction::FollowWgRoute(Position const& objective, bool checkPathB
 
     if (!hisEyesClosed)
     {
-        WgNode const& cur = g_WgGraph[m_route[m_routeStep]];
+        Node const& cur = g_Graph[m_route[m_routeStep]];
         float dx = cur.x - bot->GetPositionX();
         float dy = cur.y - bot->GetPositionY();
         float dz = cur.z - bot->GetPositionZ();
@@ -995,8 +997,8 @@ bool WgCheckFlagAction::FollowWgRoute(Position const& objective, bool checkPathB
 
     if (hisEyesClosed)
     {
-        uint32 startNode = WgFindNearestNode(bot->GetPositionX(), bot->GetPositionY(), bot->GetPositionZ());
-        m_route = WgAStarPath(startNode, goalNode, wg, checkPathBlock, bot);
+        uint32 startNode = FindNearestNode(bot->GetPositionX(), bot->GetPositionY(), bot->GetPositionZ());
+        m_route = AStarPath(startNode, goalNode, wg, checkPathBlock, bot);
         m_routeStep = 0;
         if (m_route.empty())
             return MoveTo(bot->GetMapId(),
@@ -1004,12 +1006,12 @@ bool WgCheckFlagAction::FollowWgRoute(Position const& objective, bool checkPathB
     }
 
     // The advance m_routeStep logic ensures that bots don't pause at each waypoint (most of the time) by making them re-route
-    // to the following waypoint just as they are within WG_NODE_SWITCH_DIST of the next node. Higher values switch sooner,
+    // to the following waypoint just as they are within NODE_SWITCH_DIST of the next node. Higher values switch sooner,
     // giving the bot more runway to chain movement commands before arriving at a waypoint.
     while (m_routeStep + 1 < static_cast<uint32>(m_route.size()))
     {
-        WgNode const& current = g_WgGraph[m_route[m_routeStep]];
-        if (checkPathBlock && current.pathBlock != 0 && !WgIsBuildingDestroyed(wg, current.pathBlock))
+        Node const& current = g_Graph[m_route[m_routeStep]];
+        if (checkPathBlock && current.pathBlock != 0 && !IsBuildingDestroyed(wg, current.pathBlock))
             break;
 
         // noSkip nodes (waypoints) require the bot to physically reach them before advancing. Once arrived, advance immediately
@@ -1020,19 +1022,19 @@ bool WgCheckFlagAction::FollowWgRoute(Position const& objective, bool checkPathB
             float dx = current.x - bot->GetPositionX();
             float dy = current.y - bot->GetPositionY();
             float dz = current.z - bot->GetPositionZ();
-            if (dx*dx + dy*dy + dz*dz > WG_NOSKIP_ARRIVE_DIST * WG_NOSKIP_ARRIVE_DIST)
+            if (dx*dx + dy*dy + dz*dz > NOSKIP_ARRIVE_DIST * NOSKIP_ARRIVE_DIST)
                 break;
             ++m_routeStep;
             continue;
         }
 
-        WgNode const& next = g_WgGraph[m_route[m_routeStep + 1]];
+        Node const& next = g_Graph[m_route[m_routeStep + 1]];
         float dx = next.x - bot->GetPositionX();
         float dy = next.y - bot->GetPositionY();
         float dz = next.z - bot->GetPositionZ();
 
         // Half node switching distance for vehicles (they are slow relative to infantry)
-        float switchDist = bot->GetVehicle() ? WG_NODE_SWITCH_DIST * 0.5f : WG_NODE_SWITCH_DIST;
+        float switchDist = bot->GetVehicle() ? NODE_SWITCH_DIST * 0.5f : NODE_SWITCH_DIST;
         if (dx*dx + dy*dy + dz*dz <= switchDist * switchDist)
             ++m_routeStep;
         else
@@ -1045,13 +1047,13 @@ bool WgCheckFlagAction::FollowWgRoute(Position const& objective, bool checkPathB
     //   2. A noSkip node the bot hasn't reached yet - must land on it first.
     uint32 targetIdx;
     {
-        WgNode const& node = g_WgGraph[m_route[m_routeStep]];
+        Node const& node = g_Graph[m_route[m_routeStep]];
 
         bool mustVisit = false;
 
         // Exception 1: standing wall (vehicles only).
         if (checkPathBlock && node.pathBlock != 0)
-            mustVisit = !WgIsBuildingDestroyed(wg, node.pathBlock);
+            mustVisit = !IsBuildingDestroyed(wg, node.pathBlock);
 
         // Exception 2: noSkip node not yet reached.
         if (!mustVisit && node.noSkip)
@@ -1060,7 +1062,7 @@ bool WgCheckFlagAction::FollowWgRoute(Position const& objective, bool checkPathB
             float dy = node.y - bot->GetPositionY();
             float dz = node.z - bot->GetPositionZ();
             mustVisit = (dx*dx + dy*dy + dz*dz >
-                WG_NOSKIP_ARRIVE_DIST * WG_NOSKIP_ARRIVE_DIST);
+                NOSKIP_ARRIVE_DIST * NOSKIP_ARRIVE_DIST);
         }
 
         targetIdx = mustVisit
@@ -1069,14 +1071,14 @@ bool WgCheckFlagAction::FollowWgRoute(Position const& objective, bool checkPathB
                 static_cast<uint32>(m_route.size() - 1));
     }
 
-    WgNode const& target = g_WgGraph[m_route[targetIdx]];
+    Node const& target = g_Graph[m_route[targetIdx]];
 
     // Standing wall: hold position at the pathblock node. Building attacks are handled by the attacker/defender vehicle logic
-    if (checkPathBlock && target.pathBlock != 0 && !WgIsBuildingDestroyed(wg, target.pathBlock))
+    if (checkPathBlock && target.pathBlock != 0 && !IsBuildingDestroyed(wg, target.pathBlock))
         return true;
 
     // Check arrival at objective.
-    if (bot->GetDistance(objective.GetPositionX(), objective.GetPositionY(), objective.GetPositionZ()) < WG_OBJ_ARRIVE_DIST)
+    if (bot->GetDistance(objective.GetPositionX(), objective.GetPositionY(), objective.GetPositionZ()) < OBJ_ARRIVE_DIST)
         return false;
 
     // Jitter prevents IsDuplicateMove() from blocking repeated MoveTo calls to the same node. Infantry spread out (±1 yard).
@@ -1132,19 +1134,19 @@ bool WgCheckFlagAction::Execute(Event /*event*/)
     }
 
     // Shaka, when the walls fell. Check if the fortress has been breached.
-    bool whenTheWallsFell = WgIsBuildingDestroyed(wg, WG_WS_FORTRESS_GATE) ||
-                            WgIsBuildingDestroyed(wg, WG_WS_EAST_WALL)     ||
-                            WgIsBuildingDestroyed(wg, WG_WS_WEST_WALL);
+    bool whenTheWallsFell = IsBuildingDestroyed(wg, WS_FORTRESS_GATE) ||
+                            IsBuildingDestroyed(wg, WS_EAST_WALL)     ||
+                            IsBuildingDestroyed(wg, WS_WEST_WALL);
 
     // Uzani, his army at stage: Bots will first stage their fight to either the east or west of the fortress.
     Position const& hisArmyAtStage = (wg->GetAttackerTeam() == TEAM_ALLIANCE)
-        ? WG_OBJ_INI_CONF_EAST : WG_OBJ_INI_CONF_WEST;
+        ? OBJ_INI_CONFLICT_EAST : OBJ_INI_CONFLICT_WEST;
 
     // Defender vehicles guarding the fortress hold either hisGuardAtWall (the side wall most likely to be attacked,
     // depending on faction) or hisGuardAtGate in front of Fortress Gate. Each holds up to VEHICLE_FORT_GUARD_MAX.
     Position const& hisGuardAtWall = (wg->GetAttackerTeam() == TEAM_ALLIANCE)
-        ? WG_OBJ_DEF_GUARD_EAST : WG_OBJ_DEF_GUARD_WEST;
-    Position const& hisGuardAtGate = WG_OBJ_DEF_GUARD_GATE;
+        ? OBJ_DEF_GUARD_EAST : OBJ_DEF_GUARD_WEST;
+    Position const& hisGuardAtGate = OBJ_DEF_GUARD_GATE;
 
     // ################# //
     // Attacker Vehicles
@@ -1164,7 +1166,7 @@ bool WgCheckFlagAction::Execute(Event /*event*/)
         if (m_atkGoingToWorkshop)
         {
             m_atkGoingToWorkshop = false;
-            --s_WgAtkGoingToWorkshop;
+            --s_AtkGoingToWorkshop;
             m_atkVehiclePhase = 0;
             m_route.clear();
         }
@@ -1184,12 +1186,12 @@ bool WgCheckFlagAction::Execute(Event /*event*/)
 
                 else
                 {
-                    float dE = bot->GetDistance(WG_OBJ_INI_CONF_EAST.GetPositionX(),
-                                                WG_OBJ_INI_CONF_EAST.GetPositionY(),
-                                                WG_OBJ_INI_CONF_EAST.GetPositionZ());
-                    float dW = bot->GetDistance(WG_OBJ_INI_CONF_WEST.GetPositionX(),
-                                                WG_OBJ_INI_CONF_WEST.GetPositionY(),
-                                                WG_OBJ_INI_CONF_WEST.GetPositionZ());
+                    float dE = bot->GetDistance(OBJ_INI_CONFLICT_EAST.GetPositionX(),
+                                                OBJ_INI_CONFLICT_EAST.GetPositionY(),
+                                                OBJ_INI_CONFLICT_EAST.GetPositionZ());
+                    float dW = bot->GetDistance(OBJ_INI_CONFLICT_WEST.GetPositionX(),
+                                                OBJ_INI_CONFLICT_WEST.GetPositionY(),
+                                                OBJ_INI_CONFLICT_WEST.GetPositionZ());
                     // Path B: otherwise determine which is closer, the eastern or western
                     // staging area.
                     m_atkVehiclePhase = (dE <= dW) ? 3 : 5;
@@ -1198,67 +1200,67 @@ bool WgCheckFlagAction::Execute(Event /*event*/)
             }
             case 1:     // Path A: wait until at the central staging, then check the gate
             {
-                float d = bot->GetDistance(WG_OBJ_CENTRAL_STAGE.GetPositionX(),
-                                           WG_OBJ_CENTRAL_STAGE.GetPositionY(),
-                                           WG_OBJ_CENTRAL_STAGE.GetPositionZ());
-                if (d < WG_STAGING_ARRIVE_DIST)
-                    m_atkVehiclePhase = WgIsBuildingDestroyed(wg, WG_WS_FORTRESS_GATE) ? 7 : 2;
+                float d = bot->GetDistance(OBJ_CENTRAL_STAGE.GetPositionX(),
+                                           OBJ_CENTRAL_STAGE.GetPositionY(),
+                                           OBJ_CENTRAL_STAGE.GetPositionZ());
+                if (d < STAGING_ARRIVE_DIST)
+                    m_atkVehiclePhase = IsBuildingDestroyed(wg, WS_FORTRESS_GATE) ? 7 : 2;
                 break;
             }
             case 2:     // Path A: attacking the gate; advance only when the gate falls
-                if (WgIsBuildingDestroyed(wg, WG_WS_FORTRESS_GATE))
+                if (IsBuildingDestroyed(wg, WS_FORTRESS_GATE))
                     m_atkVehiclePhase = 7;
                 break;
             case 3:     // Path B-East: wait until at the eastern staging, then check the east wall
             {
-                float d = bot->GetDistance(WG_OBJ_INI_CONF_EAST.GetPositionX(),
-                                           WG_OBJ_INI_CONF_EAST.GetPositionY(),
-                                           WG_OBJ_INI_CONF_EAST.GetPositionZ());
-                if (d < WG_STAGING_ARRIVE_DIST)
-                    m_atkVehiclePhase = WgIsBuildingDestroyed(wg, WG_WS_EAST_WALL) ? 7 : 4;
+                float d = bot->GetDistance(OBJ_INI_CONFLICT_EAST.GetPositionX(),
+                                           OBJ_INI_CONFLICT_EAST.GetPositionY(),
+                                           OBJ_INI_CONFLICT_EAST.GetPositionZ());
+                if (d < STAGING_ARRIVE_DIST)
+                    m_atkVehiclePhase = IsBuildingDestroyed(wg, WS_EAST_WALL) ? 7 : 4;
                 break;
             }
             case 4:     // Path B-East: attacking the east wall; advance only when the east wall falls
-                if (WgIsBuildingDestroyed(wg, WG_WS_EAST_WALL))
+                if (IsBuildingDestroyed(wg, WS_EAST_WALL))
                     m_atkVehiclePhase = 7;
                 break;
             case 5:     // Path B-West: wait until at the western staging, then check the west wall
             {
-                float d = bot->GetDistance(WG_OBJ_INI_CONF_WEST.GetPositionX(),
-                                           WG_OBJ_INI_CONF_WEST.GetPositionY(),
-                                           WG_OBJ_INI_CONF_WEST.GetPositionZ());
-                if (d < WG_STAGING_ARRIVE_DIST)
-                    m_atkVehiclePhase = WgIsBuildingDestroyed(wg, WG_WS_WEST_WALL) ? 7 : 6;
+                float d = bot->GetDistance(OBJ_INI_CONFLICT_WEST.GetPositionX(),
+                                           OBJ_INI_CONFLICT_WEST.GetPositionY(),
+                                           OBJ_INI_CONFLICT_WEST.GetPositionZ());
+                if (d < STAGING_ARRIVE_DIST)
+                    m_atkVehiclePhase = IsBuildingDestroyed(wg, WS_WEST_WALL) ? 7 : 6;
                 break;
             }
             case 6:     // Path B-West: attacking the west wall; advance only when the west wall falls
-                if (WgIsBuildingDestroyed(wg, WG_WS_WEST_WALL))
+                if (IsBuildingDestroyed(wg, WS_WEST_WALL))
                     m_atkVehiclePhase = 7;
                 break;
             case 7:     // Outer entry fallen; attacking central wall; advance to vault door once it falls
-                if (WgIsBuildingDestroyed(wg, WG_WS_CENTRAL_WALL))
+                if (IsBuildingDestroyed(wg, WS_CENTRAL_WALL))
                     m_atkVehiclePhase = 8;
                 break;
-            default:    // Phase 8+: terminal, no more transitions. FollowWgRoute handles routing and attacking the vault door
+            default:    // Phase 8+: terminal, no more transitions. FollowRoute handles routing and attacking the vault door
                 break;
         }
 
-        static Position const* const WG_VEHICLE_PHASES[] = {
+        static Position const* const VEHICLE_PHASES[] = {
             nullptr,                // 0  Decision phase. Never used as a destination
-            &WG_OBJ_CENTRAL_STAGE,  // 1  Path A staging
-            &WG_OBJ_FORTRESS_GATE,  // 2  Path A gate attack
-            &WG_OBJ_INI_CONF_EAST,  // 3  Path B-East staging
-            &WG_OBJ_EAST_WALL,      // 4  Path B-East wall attack
-            &WG_OBJ_INI_CONF_WEST,  // 5  Path B-West staging
-            &WG_OBJ_WEST_WALL,      // 6  Path B-West wall attack
-            &WG_OBJ_CENTRAL_WALL,   // 7  All paths converge here after breaching outer entry
-            &WG_OBJ_VAULT_DOOR,     // 8  Terminal: attack vault door until battle ends
+            &OBJ_CENTRAL_STAGE,     // 1  Path A staging
+            &OBJ_FORTRESS_GATE,     // 2  Path A gate attack
+            &OBJ_INI_CONFLICT_EAST, // 3  Path B-East staging
+            &OBJ_EAST_WALL,         // 4  Path B-East wall attack
+            &OBJ_INI_CONFLICT_WEST, // 5  Path B-West staging
+            &OBJ_WEST_WALL,         // 6  Path B-West wall attack
+            &OBJ_CENTRAL_WALL,      // 7  All paths converge here after breaching outer entry
+            &OBJ_VAULT_DOOR,        // 8  Terminal: attack vault door until battle ends
         };
-        static constexpr uint8 WG_VEHICLE_PHASE_COUNT = 9;  // Sanity guard. Shouldn't happen in practice.
-        if (m_atkVehiclePhase >= WG_VEHICLE_PHASE_COUNT)
+        static constexpr uint8 VEHICLE_PHASE_COUNT = 9;  // Sanity guard. Shouldn't happen in practice.
+        if (m_atkVehiclePhase >= VEHICLE_PHASE_COUNT)
             return false;
 
-        Position const* dest = WG_VEHICLE_PHASES[m_atkVehiclePhase];
+        Position const* dest = VEHICLE_PHASES[m_atkVehiclePhase];
         if (!dest)
             return false;
 
@@ -1267,19 +1269,19 @@ bool WgCheckFlagAction::Execute(Event /*event*/)
         static constexpr uint32 ATK_PHASE_WS[] = {
             0,                      // 0  Decision
             0,                      // 1  Path A staging
-            WG_WS_FORTRESS_GATE,    // 2  Gate attack
+            WS_FORTRESS_GATE,    // 2  Gate attack
             0,                      // 3  Path B-East staging
-            WG_WS_EAST_WALL,        // 4  East wall attack
+            WS_EAST_WALL,        // 4  East wall attack
             0,                      // 5  Path B-West staging
-            WG_WS_WEST_WALL,        // 6  West wall attack
-            WG_WS_CENTRAL_WALL,     // 7  Central wall attack
-            WG_WS_VAULT_DOOR,       // 8  Vault door attack
+            WS_WEST_WALL,        // 6  West wall attack
+            WS_CENTRAL_WALL,     // 7  Central wall attack
+            WS_VAULT_DOOR,       // 8  Vault door attack
         };
         uint32 targetWs = (m_atkVehiclePhase < 9) ? ATK_PHASE_WS[m_atkVehiclePhase] : 0;
-        if (targetWs != 0 && !WgIsBuildingDestroyed(wg, targetWs))
+        if (targetWs != 0 && !IsBuildingDestroyed(wg, targetWs))
         {
-            uint32 goEntry = WgWsToGoEntry(targetWs);
-            GameObject* go = bot->FindNearestGameObject(goEntry, WG_WALL_SCAN_DIST);
+            uint32 goEntry = WSToGoEntry(targetWs);
+            GameObject* go = bot->FindNearestGameObject(goEntry, WALL_SCAN_DIST);
             if (go)
             {
                 Unit* vehicleBase = vehicle ? vehicle->GetBase() : nullptr;
@@ -1289,11 +1291,11 @@ bool WgCheckFlagAction::Execute(Event /*event*/)
 
                 float dist = bot->GetDistance(
                     go->GetPositionX(), go->GetPositionY(), go->GetPositionZ());
-                bool atWall = (dist <= WG_WALL_MELEE_DIST);
+                bool atWall = (dist <= WALL_MELEE_DIST);
 
-                WgVehicleFireSpells(
+                VehicleFireSpells(
                     botAI, creature, vehicleBase, go,
-                    dist, WG_WALL_SCAN_DIST, atWall);
+                    dist, WALL_SCAN_DIST, atWall);
 
                 if (!atWall)
                 {
@@ -1310,7 +1312,7 @@ bool WgCheckFlagAction::Execute(Event /*event*/)
             AI_VALUE(PositionMap&, "position")["bg siege"].Reset();
         }
 
-        return FollowWgRoute(*dest, true);
+        return FollowRoute(*dest, true);
     }
 
     // ################# //
@@ -1321,24 +1323,24 @@ bool WgCheckFlagAction::Execute(Event /*event*/)
     if (!isDriver && m_defVehiclePhase > 0)
     {
         if (m_defGuardFortress == 1)
-            --s_WgFortGuardAtStage;
+            --s_FortGuardAtStage;
         else if (m_defGuardFortress == 2)
-            --s_WgFortGuardAtGate;
+            --s_FortGuardAtGate;
         else if (m_defGuardFortress == 3)
         {
-            --s_WgGuardAtWar;
+            --s_GuardAtWar;
             if (m_warTarget)
-                WgReleaseVehicleTag(m_warTarget.GetRawValue(), m_botGuidRaw);
+                ReleaseVehicleTag(m_warTarget.GetRawValue(), m_botGuidRaw);
         }
         else if (m_defGuardFortress == 4)
-            --s_WgGuardAtCourt;
+            --s_GuardAtCourt;
 
         m_defGuardFortress = 0;
         m_warTarget.Clear();
         if (m_isTowerAttacker)
         {
             m_isTowerAttacker = false;
-            --s_WgTowerSquad[m_targetTowerIdx];
+            --s_TowerSquad[m_targetTowerIdx];
             m_targetTowerIdx = 0xFF;
         }
         m_defVehiclePhase = 0;
@@ -1352,7 +1354,7 @@ bool WgCheckFlagAction::Execute(Event /*event*/)
         if (m_defGoingToWorkshop)
         {
             m_defGoingToWorkshop = false;
-            --s_WgDefGoingToWorkshop;
+            --s_DefGoingToWorkshop;
             m_defVehiclePhase = 0;
             m_route.clear();
         }
@@ -1360,9 +1362,9 @@ bool WgCheckFlagAction::Execute(Event /*event*/)
         // Defender tower targets paired with their WorldState.
         struct DefTowerTarget { Position const* pos; uint32 ws; };
         static DefTowerTarget const DEF_TOWERS[] = {
-            { &WG_OBJ_SE_TOWER,    WG_WS_TOWER_SE    },
-            { &WG_OBJ_SOUTH_TOWER, WG_WS_TOWER_SOUTH },
-            { &WG_OBJ_SW_TOWER,    WG_WS_TOWER_SW    },
+            { &OBJ_SE_TOWER,    WS_TOWER_SE    },
+            { &OBJ_SOUTH_TOWER, WS_TOWER_SOUTH },
+            { &OBJ_SW_TOWER,    WS_TOWER_SW    },
         };
         static constexpr uint8 DEF_TOWER_COUNT = 3;
 
@@ -1377,13 +1379,13 @@ bool WgCheckFlagAction::Execute(Event /*event*/)
             {
                 // Defenders always source vehicles from the fortress (for now), so they leave via a teleporter.
                 // Phase 1 gates on the teleport aura, so later phases can't start until the vehicle is outside.
-                float dE = bot->GetDistance(WG_OBJ_WS_TELE_EAST.GetPositionX(),
-                                            WG_OBJ_WS_TELE_EAST.GetPositionY(),
-                                            WG_OBJ_WS_TELE_EAST.GetPositionZ());
-                float dW = bot->GetDistance(WG_OBJ_WS_TELE_WEST.GetPositionX(),
-                                            WG_OBJ_WS_TELE_WEST.GetPositionY(),
-                                            WG_OBJ_WS_TELE_WEST.GetPositionZ());
-                m_workshopIdx     = (dE < dW) ? WG_WS_IDX_FORT_EAST : WG_WS_IDX_FORT_WEST;
+                float dE = bot->GetDistance(OBJ_WORKSHOP_TELE_EAST.GetPositionX(),
+                                            OBJ_WORKSHOP_TELE_EAST.GetPositionY(),
+                                            OBJ_WORKSHOP_TELE_EAST.GetPositionZ());
+                float dW = bot->GetDistance(OBJ_WORKSHOP_TELE_WEST.GetPositionX(),
+                                            OBJ_WORKSHOP_TELE_WEST.GetPositionY(),
+                                            OBJ_WORKSHOP_TELE_WEST.GetPositionZ());
+                m_workshopIdx     = (dE < dW) ? WORKSHOP_IDX_FORT_EAST : WORKSHOP_IDX_FORT_WEST;
                 m_defVehiclePhase = 1;
                 break;
             }
@@ -1398,11 +1400,11 @@ bool WgCheckFlagAction::Execute(Event /*event*/)
                     // Claim a guard slot if there's any, or attack the towers in phase 2.
                     bool becameGuard = false;
                     {
-                        std::lock_guard<std::mutex> lock(s_WgFortGuardPosMtx);
+                        std::lock_guard<std::mutex> lock(s_FortGuardPosMtx);
                         if (!whenTheWallsFell)
                         {
-                            bool stageIsSmaller = (s_WgFortGuardAtStage <= s_WgFortGuardAtGate);
-                            std::atomic<int32_t>& countSmaller = stageIsSmaller ? s_WgFortGuardAtStage : s_WgFortGuardAtGate;
+                            bool stageIsSmaller = (s_FortGuardAtStage <= s_FortGuardAtGate);
+                            std::atomic<int32_t>& countSmaller = stageIsSmaller ? s_FortGuardAtStage : s_FortGuardAtGate;
                             if (countSmaller < VEHICLE_FORT_GUARD_MIN)
                             {
                                 m_defGuardFortress = stageIsSmaller ? 1 : 2;
@@ -1410,10 +1412,10 @@ bool WgCheckFlagAction::Execute(Event /*event*/)
                                 becameGuard = true;
                             }
                         }
-                        else if (s_WgGuardAtCourt < VEHICLE_COURT_GUARD)
+                        else if (s_GuardAtCourt < VEHICLE_COURT_GUARD)
                         {
                             m_defGuardFortress = 4;
-                            ++s_WgGuardAtCourt;
+                            ++s_GuardAtCourt;
                             becameGuard = true;
                         }
                         if (becameGuard)
@@ -1443,16 +1445,16 @@ bool WgCheckFlagAction::Execute(Event /*event*/)
 
                 uint8 nextIdx = 0xFF;
                 {
-                    std::lock_guard<std::mutex> lock(s_WgTowerSquadMtx);
+                    std::lock_guard<std::mutex> lock(s_TowerSquadMtx);
                     for (uint8 i = 0; i < DEF_TOWER_COUNT; ++i)
                     {
                         uint8 idx = sweepOrder[i];
-                        if (WgIsBuildingDestroyed(wg, DEF_TOWERS[idx].ws))
+                        if (IsBuildingDestroyed(wg, DEF_TOWERS[idx].ws))
                             continue;
-                        if (s_WgTowerSquad[idx] < MAX_TOWER_SQUAD)
+                        if (s_TowerSquad[idx] < MAX_TOWER_SQUAD)
                         {
                             nextIdx = idx;
-                            ++s_WgTowerSquad[nextIdx];
+                            ++s_TowerSquad[nextIdx];
                             break;
                         }
                     }
@@ -1473,30 +1475,30 @@ bool WgCheckFlagAction::Execute(Event /*event*/)
             }
             case 3: // Phase 3: route to targeted tower and reassign squad on destruction.
             {
-                if (WgIsBuildingDestroyed(wg, DEF_TOWERS[m_targetTowerIdx].ws))
+                if (IsBuildingDestroyed(wg, DEF_TOWERS[m_targetTowerIdx].ws))
                 {
                     // Release and reassign under one lock: each bot's release is visible to the others' scans, so surviving
                     // squads show accurate post-destruction counts.
                     uint8 nextIdx = 0xFF;
                     {
-                        std::lock_guard<std::mutex> lock(s_WgTowerSquadMtx);
+                        std::lock_guard<std::mutex> lock(s_TowerSquadMtx);
                         if (m_isTowerAttacker)
                         {
                             m_isTowerAttacker = false;
-                            --s_WgTowerSquad[m_targetTowerIdx];
+                            --s_TowerSquad[m_targetTowerIdx];
                         }
                         for (uint8 i = 0; i < DEF_TOWER_COUNT; ++i)
                         {
-                            if (WgIsBuildingDestroyed(wg, DEF_TOWERS[i].ws))
+                            if (IsBuildingDestroyed(wg, DEF_TOWERS[i].ws))
                                 continue;
-                            if (s_WgTowerSquad[i] < MAX_TOWER_SQUAD)
+                            if (s_TowerSquad[i] < MAX_TOWER_SQUAD)
                             {
-                                if (nextIdx == 0xFF || s_WgTowerSquad[i] < s_WgTowerSquad[nextIdx])
+                                if (nextIdx == 0xFF || s_TowerSquad[i] < s_TowerSquad[nextIdx])
                                     nextIdx = i;
                             }
                         }
                         if (nextIdx != 0xFF)
-                            ++s_WgTowerSquad[nextIdx];
+                            ++s_TowerSquad[nextIdx];
                     }
 
                     if (nextIdx != 0xFF)    // Stay in phase 3, new target set above.
@@ -1527,55 +1529,55 @@ bool WgCheckFlagAction::Execute(Event /*event*/)
                     bool breachObsoletesRole = whenTheWallsFell && (m_defGuardFortress == 1 || m_defGuardFortress == 2);
                     if (m_defGuardFortress == 0 || breachObsoletesRole || now - m_defGuardFortressTime >= GUARD_REBALANCE_PERIOD)
                     {
-                        std::lock_guard<std::mutex> lock(s_WgFortGuardPosMtx);
+                        std::lock_guard<std::mutex> lock(s_FortGuardPosMtx);
                         // Release the current guard slot.
                         if (m_defGuardFortress == 1)
-                            --s_WgFortGuardAtStage;
+                            --s_FortGuardAtStage;
                         else if (m_defGuardFortress == 2)
-                            --s_WgFortGuardAtGate;
+                            --s_FortGuardAtGate;
                         else if (m_defGuardFortress == 4)
-                            --s_WgGuardAtCourt;
+                            --s_GuardAtCourt;
 
                         // Pre-breach:
                         if (!whenTheWallsFell)
                         {
-                            if (s_WgFortGuardAtStage <= s_WgFortGuardAtGate)
+                            if (s_FortGuardAtStage <= s_FortGuardAtGate)
                             {
                                 m_defGuardFortress = 1;
-                                ++s_WgFortGuardAtStage;
+                                ++s_FortGuardAtStage;
                             }
                             else
                             {
                                 m_defGuardFortress = 2;
-                                ++s_WgFortGuardAtGate;
+                                ++s_FortGuardAtGate;
                             }
                         }
                         // Post-breach:
-                        else if (s_WgGuardAtCourt < VEHICLE_COURT_GUARD)
+                        else if (s_GuardAtCourt < VEHICLE_COURT_GUARD)
                         {
                             m_defGuardFortress = 4;
-                            ++s_WgGuardAtCourt;
+                            ++s_GuardAtCourt;
                         }
                         // Pre/Post-breach: send vehicles to hunt when stationary guard slots are full.
                         else
                         {
                             m_defGuardFortress = 3;
-                            ++s_WgGuardAtWar;
+                            ++s_GuardAtWar;
                         }
                         m_defGuardFortressTime = now;
                     }
                 }
 
-                // hisGuardAtWar: chase the hunted attacker vehicle to WG_WAR_STANDOFF_DIST and hold, letting
+                // hisGuardAtWar: chase the hunted attacker vehicle to WAR_STANDOFF_DIST and hold, letting
                 // "wg hurl boulder" do the attacking. Return true to claim the tick, preventing default class combat movement.
                 if (m_defGuardFortress == 3)
                 {
                     if (Creature* target = AcquireWarTarget())
                     {
-                        if (bot->GetDistance(target) > WG_WAR_STANDOFF_DIST)
+                        if (bot->GetDistance(target) > WAR_STANDOFF_DIST)
                         {
                             Position tpos(target->GetPositionX(), target->GetPositionY(), target->GetPositionZ(), 0.0f);
-                            FollowWgRoute(tpos, true);
+                            FollowRoute(tpos, true);
                             return true;
                         }
                         if (Unit* vBase = vehicle->GetBase())
@@ -1601,22 +1603,22 @@ bool WgCheckFlagAction::Execute(Event /*event*/)
                 else if (m_defGuardFortress == 3 && !whenTheWallsFell)  // Waiting at the gate for a target in range.
                     defDest = &hisGuardAtGate;
                 else    // Post-breach, everyone goes to the court, including hunters that don't have a target yet.
-                    defDest = WgIsBuildingDestroyed(wg, WG_WS_CENTRAL_WALL) ? &WG_OBJ_CENTRAL_COURT
-                                                                           : &WG_OBJ_FRONT_COURT;
+                    defDest = IsBuildingDestroyed(wg, WS_CENTRAL_WALL) ? &OBJ_CENTRAL_COURT
+                                                                           : &OBJ_FRONT_COURT;
 
                 // Dispersion only applies once the vehicle has reached its guard area. The guard radius is at least twice the
                 // disperse distance, so a push (up to one disperse distance) won't bounce a vehicle out of the area and oscillate.
-                float guardRadius = std::max(WG_DEF_VEH_MIN_GUARD_RADIUS, 2.0f * WG_DEF_VEH_DISPERSE_DIST);
+                float guardRadius = std::max(DEF_VEH_MIN_GUARD_RADIUS, 2.0f * DEF_VEH_DISPERSE_DIST);
                 float distToDest = bot->GetDistance(defDest->GetPositionX(), defDest->GetPositionY(), defDest->GetPositionZ());
                 if (distToDest >= guardRadius)
-                    return FollowWgRoute(*defDest, true);
+                    return FollowRoute(*defDest, true);
 
-                // In the guard area: if another defender vehicle is closer than WG_DEF_VEH_DISPERSE_DIST, push directly away
+                // In the guard area: if another defender vehicle is closer than DEF_VEH_DISPERSE_DIST, push directly away
                 // from it to restore spacing so one attacker cannon shot can't damage a cluster of defender vehicles.
-                if (Creature* neighbour = WgFindNearestFriendlyVehicle(bot, WG_DEF_VEH_DISPERSE_DIST))
+                if (Creature* neighbour = FindNearestFriendlyVehicle(bot, DEF_VEH_DISPERSE_DIST))
                 {
                     // (dx, dy) points from the neighbour to this vehicle (the direction to move away). len is the distance
-                    // between them, used below to place the vehicle WG_DEF_VEH_DISPERSE_DIST away along that direction.
+                    // between them, used below to place the vehicle DEF_VEH_DISPERSE_DIST away along that direction.
                     float dx = bot->GetPositionX() - neighbour->GetPositionX();
                     float dy = bot->GetPositionY() - neighbour->GetPositionY();
                     float len = std::sqrt(dx * dx + dy * dy);
@@ -1628,8 +1630,8 @@ bool WgCheckFlagAction::Execute(Event /*event*/)
                         dy = 0.0f;
                         len = 1.0f;
                     }
-                    float moveX = neighbour->GetPositionX() + WG_DEF_VEH_DISPERSE_DIST * dx / len;
-                    float moveY = neighbour->GetPositionY() + WG_DEF_VEH_DISPERSE_DIST * dy / len;
+                    float moveX = neighbour->GetPositionX() + DEF_VEH_DISPERSE_DIST * dx / len;
+                    float moveY = neighbour->GetPositionY() + DEF_VEH_DISPERSE_DIST * dy / len;
                     AI_VALUE(LastMovement&, "last movement").lastdelayTime = 0;
                     return MoveTo(bot->GetMapId(), moveX, moveY, bot->GetPositionZ());
                 }
@@ -1645,7 +1647,7 @@ bool WgCheckFlagAction::Execute(Event /*event*/)
                 }
 
                 // Returning false would yield the tick to the bot's default class combat movement ("reach melee"/"reach spell") which drives
-                // the vehicle toward an arbitrary enemy until FollowWgRoute drags it back next tick, constantly drifting around the objective.
+                // the vehicle toward an arbitrary enemy until FollowRoute drags it back next tick, constantly drifting around the objective.
                 // Claiming the tick (return true) prevents that.
                 // However, "wg hurl boulder" (relevance 39) outranks "wg check flag" (relevance 31) and fires when a target is in range.
                 return true;
@@ -1657,7 +1659,7 @@ bool WgCheckFlagAction::Execute(Event /*event*/)
         switch (m_defVehiclePhase)
         {
             case 1:
-                dest = (m_workshopIdx == WG_WS_IDX_FORT_EAST) ? &WG_OBJ_WS_TELE_EAST : &WG_OBJ_WS_TELE_WEST;
+                dest = (m_workshopIdx == WORKSHOP_IDX_FORT_EAST) ? &OBJ_WORKSHOP_TELE_EAST : &OBJ_WORKSHOP_TELE_WEST;
                 break;
             case 2:
             case 3:
@@ -1685,8 +1687,8 @@ bool WgCheckFlagAction::Execute(Event /*event*/)
         // the destructible building.
         if (m_defVehiclePhase == 3 && m_targetTowerIdx < DEF_TOWER_COUNT)
         {
-            uint32 towerEntry = WgWsToGoEntry(DEF_TOWERS[m_targetTowerIdx].ws);
-            GameObject* go = bot->FindNearestGameObject(towerEntry, WG_TOWER_SCAN_DIST);
+            uint32 towerEntry = WSToGoEntry(DEF_TOWERS[m_targetTowerIdx].ws);
+            GameObject* go = bot->FindNearestGameObject(towerEntry, TOWER_SCAN_DIST);
             if (go)
             {
                 Unit* vehicleBase = vehicle ? vehicle->GetBase() : nullptr;
@@ -1696,11 +1698,11 @@ bool WgCheckFlagAction::Execute(Event /*event*/)
 
                 float dist = bot->GetDistance(
                     go->GetPositionX(), go->GetPositionY(), go->GetPositionZ());
-                bool atTower = (dist <= WG_TOWER_MELEE_DIST);
+                bool atTower = (dist <= TOWER_MELEE_DIST);
 
-                bool spellFired = WgVehicleFireSpells(
+                bool spellFired = VehicleFireSpells(
                     botAI, creature, vehicleBase, go,
-                    dist, WG_TOWER_SCAN_DIST, atTower);
+                    dist, TOWER_SCAN_DIST, atTower);
 
                 if (!atTower)
                 {
@@ -1714,7 +1716,7 @@ bool WgCheckFlagAction::Execute(Event /*event*/)
             }
         }
 
-        return FollowWgRoute(*dest, true);
+        return FollowRoute(*dest, true);
     }
 
     // Infantry: Clear any leftover siege position from vehicle driving.
@@ -1733,18 +1735,18 @@ bool WgCheckFlagAction::Execute(Event /*event*/)
             uint32 dataMax = (team == TEAM_HORDE) ? BATTLEFIELD_WG_DATA_MAX_VEHICLE_H : BATTLEFIELD_WG_DATA_MAX_VEHICLE_A;
 
             // Alliance uses Fortress WS West and Horde uses Fortress WS East.
-            uint8 wsIdx = (team == TEAM_ALLIANCE) ? WG_WS_IDX_FORT_WEST : WG_WS_IDX_FORT_EAST;
-            WgPath const& wsPath = *WG_WORKSHOPS[wsIdx].path;
+            uint8 wsIdx = (team == TEAM_ALLIANCE) ? WORKSHOP_IDX_FORT_WEST : WORKSHOP_IDX_FORT_EAST;
+            Path const& wsPath = *WORKSHOPS[wsIdx].path;
             Position const engineerPos(wsPath[0].x, wsPath[0].y, wsPath[0].z, 0.0f);
 
             // Defenders are made to get vehicles only from inside the fortress, thus they can only A* navigate to the fortress
             // workshop engineer if the fortress has been breached, or if they are inside the fortress already.
-            // whenTheWallsFell is used instead of WgCanReach alone, because whenTheWallsFell is a cheaper check.
-            bool canEnterFortress = whenTheWallsFell || WgCanReach(bot, engineerPos, wg);
+            // whenTheWallsFell is used instead of CanReach alone, because whenTheWallsFell is a cheaper check.
+            bool canEnterFortress = whenTheWallsFell || CanReach(bot, engineerPos, wg);
 
             if (canEnterFortress)
             {
-                if (wg->GetWorkshopTeam(WG_WORKSHOPS[wsIdx].workshopId) == team)
+                if (wg->GetWorkshopTeam(WORKSHOPS[wsIdx].workshopId) == team)
                 {
                     uint32 vehCount   = wg->GetData(dataVeh);
                     uint32 vehMax     = wg->GetData(dataMax);
@@ -1757,16 +1759,16 @@ bool WgCheckFlagAction::Execute(Event /*event*/)
                         // Post-breach: everyone can freely enter the fortress, so limit concurrent trips with WS_GO_DEF_MULTIPLIER.
                         bool capOk = !whenTheWallsFell    ||
                                      m_defGoingToWorkshop ||
-                                     (s_WgDefGoingToWorkshop < static_cast<int32>(WS_GO_DEF_MULTIPLIER * availSlots));
+                                     (s_DefGoingToWorkshop < static_cast<int32>(WS_GO_DEF_MULTIPLIER * availSlots));
                         if (capOk)
                         {
                             if (!m_defGoingToWorkshop)
                             {
                                 m_defGoingToWorkshop = true;
-                                ++s_WgDefGoingToWorkshop;
+                                ++s_DefGoingToWorkshop;
                             }
                             m_workshopIdx = wsIdx;
-                            return FollowWgRoute(engineerPos, false);
+                            return FollowRoute(engineerPos, false);
                         }
                     }
                 }
@@ -1777,7 +1779,7 @@ bool WgCheckFlagAction::Execute(Event /*event*/)
         if (m_defGoingToWorkshop)
         {
             m_defGoingToWorkshop = false;
-            --s_WgDefGoingToWorkshop;
+            --s_DefGoingToWorkshop;
         }
 
         // Divert a percentage of defenders to capture hostile/neutral workshops.
@@ -1795,7 +1797,7 @@ bool WgCheckFlagAction::Execute(Event /*event*/)
             return false;
 
         // Chenza, go to the court, the court of silence. Abandon conflict at hisArmyAtStage if the fortress is breached.
-        return FollowWgRoute(whenTheWallsFell ? WG_OBJ_FRONT_COURT : hisArmyAtStage, false);
+        return FollowRoute(whenTheWallsFell ? OBJ_FRONT_COURT : hisArmyAtStage, false);
     }
 
     // ################## //
@@ -1814,17 +1816,17 @@ bool WgCheckFlagAction::Execute(Event /*event*/)
         if (availSlots > 0)
         {
             // Workshop priority for attackers: First friendly wins.
-            static constexpr uint8 ATK_WS_PRIORITY_A[] = { WG_WS_IDX_NE, WG_WS_IDX_SE,
-                                                            WG_WS_IDX_NW, WG_WS_IDX_SW };    // Alliance
-            static constexpr uint8 ATK_WS_PRIORITY_H[] = { WG_WS_IDX_NW, WG_WS_IDX_SW,
-                                                            WG_WS_IDX_NE, WG_WS_IDX_SE };    // Horde
+            static constexpr uint8 ATK_WS_PRIORITY_A[] = { WORKSHOP_IDX_NE, WORKSHOP_IDX_SE,
+                                                            WORKSHOP_IDX_NW, WORKSHOP_IDX_SW };    // Alliance
+            static constexpr uint8 ATK_WS_PRIORITY_H[] = { WORKSHOP_IDX_NW, WORKSHOP_IDX_SW,
+                                                            WORKSHOP_IDX_NE, WORKSHOP_IDX_SE };    // Horde
             uint8 const* ATK_WS_PRIORITY = (team == TEAM_ALLIANCE) ? ATK_WS_PRIORITY_A : ATK_WS_PRIORITY_H;
 
             uint8 bestWsIdx = 0xFF;
-            for (uint8 p = 0; p < WG_CAPTURABLE_WORKSHOP_COUNT && bestWsIdx == 0xFF; ++p)
+            for (uint8 p = 0; p < CAPTURABLE_WORKSHOP_COUNT && bestWsIdx == 0xFF; ++p)
             {
                 uint8 wsIdx = ATK_WS_PRIORITY[p];
-                if (wg->GetWorkshopTeam(WG_WORKSHOPS[wsIdx].workshopId) != team)
+                if (wg->GetWorkshopTeam(WORKSHOPS[wsIdx].workshopId) != team)
                     continue;
 
                 bestWsIdx = wsIdx;
@@ -1833,19 +1835,19 @@ bool WgCheckFlagAction::Execute(Event /*event*/)
             if (bestWsIdx != 0xFF)
             {
                 bool capOk = m_atkGoingToWorkshop ||
-                             (s_WgAtkGoingToWorkshop < static_cast<int32>(WS_GO_ATK_MULTIPLIER * availSlots));
+                             (s_AtkGoingToWorkshop < static_cast<int32>(WS_GO_ATK_MULTIPLIER * availSlots));
                 if (capOk)
                 {
                     if (!m_atkGoingToWorkshop)
                     {
                         m_atkGoingToWorkshop = true;
-                        ++s_WgAtkGoingToWorkshop;
+                        ++s_AtkGoingToWorkshop;
                     }
                     m_workshopIdx = bestWsIdx;
 
-                    WgPath const& wsPath = *WG_WORKSHOPS[bestWsIdx].path;
+                    Path const& wsPath = *WORKSHOPS[bestWsIdx].path;
                     Position const engineerPos(wsPath[0].x, wsPath[0].y, wsPath[0].z, 0.0f);
-                    return FollowWgRoute(engineerPos, false);
+                    return FollowRoute(engineerPos, false);
                 }
             }
         }
@@ -1855,7 +1857,7 @@ bool WgCheckFlagAction::Execute(Event /*event*/)
     if (m_atkGoingToWorkshop)
     {
         m_atkGoingToWorkshop = false;
-        --s_WgAtkGoingToWorkshop;
+        --s_AtkGoingToWorkshop;
     }
 
     // Divert a percentage of attackers to capture hostile/neutral workshops.
@@ -1873,7 +1875,7 @@ bool WgCheckFlagAction::Execute(Event /*event*/)
         return false;
 
     // Uzani, his army with fists closed: Attackers have breached the fortress. Go into the fortress. Abandon conflict at hisArmyAtStage.
-    return FollowWgRoute(whenTheWallsFell ? WG_OBJ_CENTRAL_COURT : hisArmyAtStage, false);
+    return FollowRoute(whenTheWallsFell ? OBJ_CENTRAL_COURT : hisArmyAtStage, false);
 }
 
 // Summons a vehicle by interacting with the workshop engineer: Siege engines for attackers, demolishers for defenders.
@@ -1906,13 +1908,13 @@ bool WgSummonVehicleAction::Execute(Event /*event*/)
     if (!engineer)
         return false;
 
-    // Defenders may only summon at a fortress workshop (WG_WORKSHOPS indices 4 and 5). The defender vehicle phase
+    // Defenders may only summon at a fortress workshop (WORKSHOPS indices 4 and 5). The defender vehicle phase
     // system assumes a fortress-teleporter launch, so reject summoning at an outer workshop a defender happens to
     // stand near. ENGINEER_SCAN_RANGE here doubles as the fortress-waypoint match tolerance.
     if (!isAttacker)
     {
-        WgPath const& wsEast = *WG_WORKSHOPS[WG_WS_IDX_FORT_EAST].path;
-        WgPath const& wsWest = *WG_WORKSHOPS[WG_WS_IDX_FORT_WEST].path;
+        Path const& wsEast = *WORKSHOPS[WORKSHOP_IDX_FORT_EAST].path;
+        Path const& wsWest = *WORKSHOPS[WORKSHOP_IDX_FORT_WEST].path;
         bool atFortressWorkshop =
             engineer->GetDistance(wsWest[0].x, wsWest[0].y, wsWest[0].z) < ENGINEER_SCAN_RANGE ||
             engineer->GetDistance(wsEast[0].x, wsEast[0].y, wsEast[0].z) < ENGINEER_SCAN_RANGE;
@@ -2004,7 +2006,7 @@ bool WgMountTowerCannonAction::Execute(Event /*event*/)
             if (bot->GetExactDist2d(cannon) > 20.0f)
             {
                 if (checkFlag)
-                    return checkFlag->FollowWgRoute(*cannon, false);
+                    return checkFlag->FollowRoute(*cannon, false);
                 return MoveTo(cannon);
             }
 
@@ -2029,10 +2031,10 @@ bool WgMountTowerCannonAction::Execute(Event /*event*/)
         return false;
     }
 
-    // Scan gate: only when the bot is within WG_CANNON_CENTRAL_WALL_RANGE of the fortress central wall.
-    if (bot->GetDistance(WG_OBJ_CENTRAL_WALL.GetPositionX(),
-                         WG_OBJ_CENTRAL_WALL.GetPositionY(),
-                         WG_OBJ_CENTRAL_WALL.GetPositionZ()) > WG_CANNON_CENTRAL_WALL_RANGE)
+    // Scan gate: only when the bot is within CANNON_CENTRAL_WALL_RANGE of the fortress central wall.
+    if (bot->GetDistance(OBJ_CENTRAL_WALL.GetPositionX(),
+                         OBJ_CENTRAL_WALL.GetPositionY(),
+                         OBJ_CENTRAL_WALL.GetPositionZ()) > CANNON_CENTRAL_WALL_RANGE)
         return false;
 
     // Level-priority stagger: normalize bot levels into 3 groups (0-2). Higher level bots have higher initial delay to scan for available
@@ -2044,21 +2046,21 @@ bool WgMountTowerCannonAction::Execute(Event /*event*/)
 
     uint32 now = getMSTime();
     if (m_cannonScanTime == 0)
-        m_cannonScanTime = now + (WG_SCAN_INTERVAL * stagger);
+        m_cannonScanTime = now + (CANNON_SCAN_INTERVAL * stagger);
 
     if (now < m_cannonScanTime)
         return false;
 
-    m_cannonScanTime = now + (WG_SCAN_INTERVAL * (1u + stagger));
+    m_cannonScanTime = now + (CANNON_SCAN_INTERVAL * (1u + stagger));
 
     // If the bot can't A* navigate to the Central Wall, it can't A* navigate to any fortress cannon.
-    if (!WgCanReach(bot, WG_OBJ_CENTRAL_WALL, wg))
+    if (!CanReach(bot, OBJ_CENTRAL_WALL, wg))
         return false;
 
-    // Collect all NPC_WINTERGRASP_TOWER_CANNON creatures within WG_OBJ_SCAN_RANGE of the bot, keeping those that match
-    // a known cannon position in g_WgCannonPaths (within WG_CANNON_SEARCH_RADIUS).
+    // Collect all NPC_WINTERGRASP_TOWER_CANNON creatures within OBJ_SCAN_RANGE of the bot, keeping those that match
+    // a known cannon position in g_CannonPaths (within CANNON_SEARCH_RADIUS).
     std::list<Creature*> nearby;
-    bot->GetCreatureListWithEntryInGrid(nearby, NPC_WINTERGRASP_TOWER_CANNON, WG_OBJ_SCAN_RANGE);
+    bot->GetCreatureListWithEntryInGrid(nearby, NPC_WINTERGRASP_TOWER_CANNON, OBJ_SCAN_RANGE);
 
     std::vector<Creature*> candidates;
     for (Creature* c : nearby)
@@ -2069,10 +2071,10 @@ bool WgMountTowerCannonAction::Execute(Event /*event*/)
         if (!veh || !veh->GetAvailableSeatCount())
             continue;
 
-        for (uint8 i = 0; i < WG_DEFENDER_CANNON_COUNT; ++i)
+        for (uint8 i = 0; i < DEFENDER_CANNON_COUNT; ++i)
         {
-            WgWaypoint const& cp = g_WgCannonPaths[i][0];
-            if (c->GetExactDist(cp.x, cp.y, cp.z) <= WG_CANNON_SEARCH_RADIUS)
+            Waypoint const& cp = g_CannonPaths[i][0];
+            if (c->GetExactDist(cp.x, cp.y, cp.z) <= CANNON_SEARCH_RADIUS)
             {
                 candidates.push_back(c);
                 break;
@@ -2089,7 +2091,7 @@ bool WgMountTowerCannonAction::Execute(Event /*event*/)
     // Start the A* approach toward the cannon node and the navigation block above will continue it next tick.
     WgCheckFlagAction* checkFlag = static_cast<WgCheckFlagAction*>(botAI->GetAiObjectContext()->GetAction("wg check flag"));
     if (checkFlag)
-        return checkFlag->FollowWgRoute(*chosen, false);
+        return checkFlag->FollowRoute(*chosen, false);
 
     return MoveTo(chosen);
 }
@@ -2098,7 +2100,7 @@ bool WgMountTowerCannonAction::Execute(Event /*event*/)
 Unit* WgFireCannonAction::GetTarget()
 {
     // Prioritize mounted hostile vehicle.
-    Creature* nearest = WgFindNearestHostileVehicle(bot, CANNON_TARGET_SCAN);
+    Creature* nearest = FindNearestHostileVehicle(bot, CANNON_TARGET_SCAN);
     if (nearest)
         return nearest;
 
@@ -2110,7 +2112,7 @@ Unit* WgFireCannonAction::GetTarget()
 Unit* WgHurlBoulderAction::GetTarget()
 {
     // Prioritize mounted hostile vehicle.
-    Creature* nearest = WgFindNearestHostileVehicle(bot, VEHICLE_TARGET_SCAN);
+    Creature* nearest = FindNearestHostileVehicle(bot, VEHICLE_TARGET_SCAN);
     if (nearest)
         return nearest;
 
