@@ -236,6 +236,8 @@ private:
     time_t DelayLoginBotsTimer;
     time_t printStatsTimer;
     uint32 AddRandomBots();
+    uint32 RemoveRandomBots();
+    bool IsRemovableBot(Player* bot);
     bool ProcessBot(uint32 bot);
     void ScheduleRandomize(uint32 bot, uint32 time);
     void RandomTeleport(Player* bot);

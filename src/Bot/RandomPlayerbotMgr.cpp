@@ -381,6 +381,12 @@ void RandomPlayerbotMgr::UpdateAIInternal(uint32 /*elapsed*/, bool /*minimal*/)
         AddRandomBots();
     }
 
+    // If the randombot population requires a trim this cycle, it is not executed when DisabledWithoutRealPlayer is
+    // enabled and there are no real players logged-in. In that case, DisabledWithoutRealPlayer handles logouts.
+    if (availableBotCount > maxAllowedBotCount &&
+        (!sPlayerbotAIConfig.disabledWithoutRealPlayer || realPlayerIsLogged))
+        RemoveRandomBots();
+
     if (sPlayerbotAIConfig.syncLevelWithPlayers && !players.empty())
     {
         if (time(nullptr) > (PlayersCheckTimer + 60))
@@ -557,9 +563,7 @@ void RandomPlayerbotMgr::AssignAccountTypes()
 
         // Take periodic online-offline into account
         if (sPlayerbotAIConfig.enablePeriodicOnlineOffline)
-        {
             maxBots *= sPlayerbotAIConfig.periodicOnlineOfflineRatio;
-        }
 
         // Calculate base accounts needed for RNDbots, ensuring round up for maxBots not cleanly divisible by the divisor
         neededRndBotAccounts = (maxBots + divisor - 1) / divisor;
@@ -571,8 +575,10 @@ void RandomPlayerbotMgr::AssignAccountTypes()
 
     for (auto const& [accountId, accountType] : currentAssignments)
     {
-        if (accountType == 1) existingRndBotAccounts++;
-        else if (accountType == 2) existingAddClassAccounts++;
+        if (accountType == 1)
+            existingRndBotAccounts++;
+        else if (accountType == 2)
+            existingAddClassAccounts++;
     }
 
     // Assign RNDbot accounts from lowest position if needed
@@ -593,9 +599,7 @@ void RandomPlayerbotMgr::AssignAccountTypes()
         }
 
         if (assigned < toAssign)
-        {
             LOG_ERROR("playerbots", "Not enough unassigned accounts to fulfill RNDbot requirements. Need {} more accounts.", toAssign - assigned);
-        }
     }
 
     // Assign AddClass accounts from highest position if needed
@@ -618,16 +622,16 @@ void RandomPlayerbotMgr::AssignAccountTypes()
         }
 
         if (assigned < toAssign)
-        {
             LOG_ERROR("playerbots", "Not enough unassigned accounts to fulfill AddClass requirements. Need {} more accounts.", toAssign - assigned);
-        }
     }
 
     // Populate filtered account lists with ALL accounts of each type
     for (auto const& [accountId, accountType] : currentAssignments)
     {
-        if (accountType == 1) rndBotTypeAccounts.push_back(accountId);
-        else if (accountType == 2) addClassTypeAccounts.push_back(accountId);
+        if (accountType == 1)
+            rndBotTypeAccounts.push_back(accountId);
+        else if (accountType == 2)
+            addClassTypeAccounts.push_back(accountId);
     }
 
     LOG_INFO("playerbots", "Account type assignment complete: {} RNDbot accounts, {} AddClass accounts, {} unassigned",
@@ -644,8 +648,8 @@ bool RandomPlayerbotMgr::IsAccountType(uint32 accountId, uint8 accountType)
 // Logs-in bots in 4 phases. Phase 1 logs Alliance bots up to how much is expected according to the faction ratio,
 // and Phase 2 logs-in the remainder Horde bots to reach the total maxAllowedBotCount. If maxAllowedBotCount is not
 // reached after Phase 2, the function goes back to log-in Alliance bots and reach maxAllowedBotCount. This is done
-// because not every account is guaranteed 5A/5H bots, so the true ratio might be skewed by few percentages. Finally,
-// Phase 4 is reached if and only if the value of RandomBotAccountCount is lower than it should.
+// because not every account is guaranteed 5A/5H bots, so the true ratio might be skewed by a few percentages.
+// Finally, Phase 4 is reached if and only if the value of RandomBotAccountCount is lower than it should.
 uint32 RandomPlayerbotMgr::AddRandomBots()
 {
     uint32 maxAllowedBotCount = GetEventValue(0, "bot_count");
@@ -668,9 +672,7 @@ uint32 RandomPlayerbotMgr::AddRandomBots()
 
         // Fix #1082: Randomly add one based on reminder
         if (remainder && urand(1, totalRatio) <= remainder)
-        {
             allowedAllianceCount++;
-        }
 
         // Determine which accounts to use based on EnablePeriodicOnlineOffline
         std::vector<uint32> accountsToUse;
@@ -692,9 +694,7 @@ uint32 RandomPlayerbotMgr::AddRandomBots()
             }
         }
         else
-        {
             accountsToUse = rndBotTypeAccounts;
-        }
 
         // Pre-map all characters from selected accounts
         struct CharacterInfo
@@ -813,20 +813,113 @@ uint32 RandomPlayerbotMgr::AddRandomBots()
                 LOG_ERROR("playerbots",
                           "Can't log-in all the requested bots. Try increasing RandomBotAccountCount in your conf file.\n"
                           "{} more accounts needed.", moreAccountsNeeded);
-                missingBotsTimer = 0;    // Reset timer so error is not spammed every tick
+                missingBotsTimer = 0;   // Reset timer so error is not spammed every tick
             }
         }
         else
-        {
             missingBotsTimer = 0;       // Reset timer if logins for this interval were successful
-        }
     }
     else
-    {
         missingBotsTimer = 0;           // Reset timer if there's enough bots
-    }
 
     return currentBots.size();
+}
+
+// Whether a randombot can be safely logged out right now for a population downsize. Ineligible Bots are skipped
+// and simply get trimmed on a later tick, if they become free and there's still unfulfilled demand for logouts.
+bool RandomPlayerbotMgr::IsRemovableBot(Player* bot)
+{
+    if (!bot || !bot->IsInWorld() || !IsRandomBot(bot))
+        return false;
+
+    // In-flight or mid-teleport.
+    if (bot->HasUnitState(UNIT_STATE_IN_FLIGHT) || bot->IsBeingTeleported())
+        return false;
+
+    // In a battleground, battlefield (Wintergrasp), arena or any of their queues.
+    if (bot->InBattleground() || bot->InBattlefield() || bot->InArena() || bot->InBattlegroundQueue())
+        return false;
+
+    // In a dungeon or raid (IsDungeon() covers both).
+    if (bot->GetMap() && bot->GetMap()->IsDungeon())
+        return false;
+
+    // Controlled by a real player. IsRandomBot is not enough if a real player is logged into a randombot.
+    if (PlayerbotAI* botAI = GET_PLAYERBOT_AI(bot))
+        if (botAI->HasRealPlayerMaster())
+            return false;
+
+    // Grouped with a real player. (PR #2592 may fold this into the master check above.)
+    if (Group* group = bot->GetGroup())
+    {
+        for (GroupReference* ref = group->GetFirstMember(); ref; ref = ref->next())
+        {
+            Player* member = ref->GetSource();
+            if (member && member != bot && !GET_PLAYERBOT_AI(member))
+                return false;
+        }
+    }
+
+    return true;
+}
+
+// Logs out randombots when the online population is above the target count for this cycle.
+uint32 RandomPlayerbotMgr::RemoveRandomBots()
+{
+    uint32 maxAllowedBotCount = GetEventValue(0, "bot_count");
+
+    if (currentBots.size() <= maxAllowedBotCount)
+        return 0;
+
+    // Per-tick cap keeps the downsize gradual, matching how AddRandomBots throttles logins.
+    uint32 toRemove = std::min(sPlayerbotAIConfig.randomBotsPerInterval,
+                               (uint32)(currentBots.size() - maxAllowedBotCount));
+
+    // Collect the online bots that are safe to log out, split by faction.
+    std::vector<ObjectGuid> allianceBots;
+    std::vector<ObjectGuid> hordeBots;
+    for (auto const& [guid, bot] : playerBots)
+    {
+        if (!IsRemovableBot(bot))
+            continue;
+
+        if (IsAlliance(bot->getRace()))
+            allianceBots.push_back(guid);
+        else
+            hordeBots.push_back(guid);
+    }
+
+    // Split the removal across factions by the configured ratio. The resulting ratio might be skewed by a few
+    // percentages, as the approach used here is the same approach as AddRandomBots.
+    uint32 totalRatio = sPlayerbotAIConfig.randomBotAllianceRatio + sPlayerbotAIConfig.randomBotHordeRatio;
+    uint32 removeAlliance = toRemove * sPlayerbotAIConfig.randomBotAllianceRatio / totalRatio;
+    uint32 remainder = toRemove * sPlayerbotAIConfig.randomBotAllianceRatio % totalRatio;
+    if (remainder && urand(1, totalRatio) <= remainder)
+        removeAlliance++;
+    uint32 removeHorde = toRemove - removeAlliance;
+
+    // Never remove more than are actually available in each faction this tick.
+    removeAlliance = std::min(removeAlliance, (uint32)allianceBots.size());
+    removeHorde = std::min(removeHorde, (uint32)hordeBots.size());
+
+    std::vector<ObjectGuid> toLogout;
+    toLogout.insert(toLogout.end(), allianceBots.begin(), allianceBots.begin() + removeAlliance);
+    toLogout.insert(toLogout.end(), hordeBots.begin(), hordeBots.begin() + removeHorde);
+
+    // Reuse the same teardown as the 'add' event expiry path from ProcessBot.
+    for (ObjectGuid guid : toLogout)
+    {
+        uint32 bot = guid.GetCounter();
+        SetEventValue(bot, "add", 0, 0);
+        currentBots.erase(bot);
+        LogoutPlayerBot(guid);
+    }
+
+    if (!toLogout.empty())
+        LOG_DEBUG("playerbots", "Logged-out {} randombots to match target count of {}", toLogout.size(),
+                  maxAllowedBotCount);
+
+    return toLogout.size();
 }
 
 void RandomPlayerbotMgr::LoadBattleMastersCache()
