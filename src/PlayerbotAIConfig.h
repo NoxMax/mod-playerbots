@@ -308,8 +308,6 @@ public:
     uint32 limitEnchantExpansion;
     uint32 limitGearExpansion;
     uint32 randombotStartingLevel;
-    bool enablePeriodicOnlineOffline;
-    float periodicOnlineOfflineRatio;
     bool gearscorecheck;
     bool randomBotPreQuests;
     bool botSendMailEnabled;

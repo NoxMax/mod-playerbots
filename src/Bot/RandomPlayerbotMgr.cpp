@@ -499,10 +499,9 @@ void RandomPlayerbotMgr::UpdateAIInternal(uint32 /*elapsed*/, bool /*minimal*/)
 //     setActivityPercentage(activityPercentage);
 // }
 
-// Assigns accounts as RNDbot accounts (type 1) based on MaxRandomBots and EnablePeriodicOnlineOffline and its ratio,
-// and assigns accounts as AddClass accounts (type 2) based AddClassAccountPoolSize. Type 1 and 2 assignments are
-// permenant, unless MaxRandomBots or AddClassAccountPoolSize are set to 0. If so, their associated accounts will
-// be unassigned (type 0)
+// Assigns accounts as RNDbot accounts (type 1) based on MaxRandomBots, and assigns accounts as AddClass
+// accounts (type 2) based AddClassAccountPoolSize. Type 1 and 2 assignments are permenant, unless MaxRandomBots
+// or AddClassAccountPoolSize are set to 0. If so, their associated accounts will be unassigned (type 0)
 void RandomPlayerbotMgr::AssignAccountTypes()
 {
     LOG_INFO("playerbots", "Assigning account types for random bot accounts...");
@@ -560,10 +559,6 @@ void RandomPlayerbotMgr::AssignAccountTypes()
     {
         int divisor = RandomPlayerbotFactory::CalculateAvailableCharsPerAccount();
         int maxBots = sPlayerbotAIConfig.maxRandomBots;
-
-        // Take periodic online-offline into account
-        if (sPlayerbotAIConfig.enablePeriodicOnlineOffline)
-            maxBots *= sPlayerbotAIConfig.periodicOnlineOfflineRatio;
 
         // Calculate base accounts needed for RNDbots, ensuring round up for maxBots not cleanly divisible by the divisor
         neededRndBotAccounts = (maxBots + divisor - 1) / divisor;
@@ -674,29 +669,7 @@ uint32 RandomPlayerbotMgr::AddRandomBots()
         if (remainder && urand(1, totalRatio) <= remainder)
             allowedAllianceCount++;
 
-        // Determine which accounts to use based on EnablePeriodicOnlineOffline
-        std::vector<uint32> accountsToUse;
-        if (sPlayerbotAIConfig.enablePeriodicOnlineOffline)
-        {
-
-            // Calculate how many accounts can be used
-            // With enablePeriodicOnlineOffline, don't use all of rndBotTypeAccounts right away. Fraction results are rounded up
-            uint32 accountsToUseCount = (rndBotTypeAccounts.size() + sPlayerbotAIConfig.periodicOnlineOfflineRatio - 1)
-                                        / sPlayerbotAIConfig.periodicOnlineOfflineRatio;
-
-            // Randomly select accounts
-            std::vector<uint32> shuffledAccounts = rndBotTypeAccounts;
-            std::shuffle(shuffledAccounts.begin(), shuffledAccounts.end(), rng);
-
-            for (uint32 i = 0; i < accountsToUseCount && i < shuffledAccounts.size(); i++)
-            {
-                accountsToUse.push_back(shuffledAccounts[i]);
-            }
-        }
-        else
-            accountsToUse = rndBotTypeAccounts;
-
-        // Pre-map all characters from selected accounts
+        // Pre-map all characters from every RNDbot account.
         struct CharacterInfo
         {
             uint32 guid;
@@ -706,7 +679,7 @@ uint32 RandomPlayerbotMgr::AddRandomBots()
         };
         std::vector<CharacterInfo> allCharacters;
 
-        for (uint32 accountId : accountsToUse)
+        for (uint32 accountId : rndBotTypeAccounts)
         {
             CharacterDatabasePreparedStatement* stmt =
                 CharacterDatabase.GetPreparedStatement(CHAR_SEL_CHARS_BY_ACCOUNT_ID);
@@ -755,10 +728,7 @@ uint32 RandomPlayerbotMgr::AddRandomBots()
                 return false;
             }
 
-            uint32 add_time = sPlayerbotAIConfig.enablePeriodicOnlineOffline
-                                ? urand(sPlayerbotAIConfig.minRandomBotInWorldTime,
-                                        sPlayerbotAIConfig.maxRandomBotInWorldTime)
-                                : sPlayerbotAIConfig.permanentlyInWorldTime;
+            uint32 add_time = sPlayerbotAIConfig.permanentlyInWorldTime;
 
             SetEventValue(charInfo.guid, "add", 1, add_time);
             SetEventValue(charInfo.guid, "logout", 0, 0);
