@@ -296,8 +296,19 @@ void RandomPlayerbotMgr::UpdateAIInternal(uint32 /*elapsed*/, bool /*minimal*/)
     }*/
 
     uint32 maxAllowedBotCount = GetEventValue(0, "bot_count");
-    if (!maxAllowedBotCount || (maxAllowedBotCount < sPlayerbotAIConfig.minRandomBots ||
-                                maxAllowedBotCount > sPlayerbotAIConfig.maxRandomBots))
+    if (sPlayerbotAIConfig.randomBotCountMode == 0)
+    {
+        // Mode 0 (static): roll a count once at server start and hold it for the whole run.
+        if (!_staticBotCountRolled)
+        {
+            maxAllowedBotCount = urand(sPlayerbotAIConfig.minRandomBots, sPlayerbotAIConfig.maxRandomBots);
+            SetEventValue(0, "bot_count", maxAllowedBotCount, sPlayerbotAIConfig.permanentlyInWorldTime);
+            _staticBotCountRolled = true;
+        }
+    }
+    // Mode 1 (variable): roll a count at server start and re-roll it every randomBotCountChangeMin/MaxInterval.
+    else if (!maxAllowedBotCount || (maxAllowedBotCount < sPlayerbotAIConfig.minRandomBots ||
+                                     maxAllowedBotCount > sPlayerbotAIConfig.maxRandomBots))
     {
         maxAllowedBotCount = urand(sPlayerbotAIConfig.minRandomBots, sPlayerbotAIConfig.maxRandomBots);
         SetEventValue(0, "bot_count", maxAllowedBotCount,

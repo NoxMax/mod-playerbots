@@ -118,6 +118,14 @@ AiPlayerbot.DisabledWithoutRealPlayer = 0
 AiPlayerbot.DisabledWithoutRealPlayerLoginDelay = 30
 AiPlayerbot.DisabledWithoutRealPlayerLogoutDelay = 300
 
+# Online randombots count change
+#   0 = Static:     Fixed random count rolled once at server start, between Min/MaxRandomBots.
+#   1 = Variable:   Fluctuating random count rolled at server start, between Min/MaxRandomBots.
+#                   Re-rolled again at a time between RandomBotCountChangeMin/MaxInterval.
+# When MinRandomBots = MaxRandomBots the count is constant and all modes behave identically.
+# Default: 0 (static)
+AiPlayerbot.RandomBotCountMode = 0
+
 ####################################################################################################
 
 ###################################
