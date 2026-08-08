@@ -11,6 +11,7 @@
 #include "Cell.h"
 #include "CellImpl.h"
 #include "ChannelMgr.h"
+#include "Common.h" // Included for TimeConstants. Using DAY to mark a long time, and YEAR to mark permanence.
 #include "DBCStores.h"
 #include "DBCStructure.h"
 #include "DatabaseEnv.h"
@@ -302,7 +303,7 @@ void RandomPlayerbotMgr::UpdateAIInternal(uint32 /*elapsed*/, bool /*minimal*/)
         if (!_staticBotCountRolled)
         {
             maxAllowedBotCount = urand(sPlayerbotAIConfig.minRandomBots, sPlayerbotAIConfig.maxRandomBots);
-            SetEventValue(0, "bot_count", maxAllowedBotCount, sPlayerbotAIConfig.permanentlyInWorldTime);
+            SetEventValue(0, "bot_count", maxAllowedBotCount, YEAR);
             _staticBotCountRolled = true;
         }
     }
@@ -728,7 +729,7 @@ uint32 RandomPlayerbotMgr::AddRandomBots()
                 return false;
             }
 
-            uint32 add_time = sPlayerbotAIConfig.permanentlyInWorldTime;
+            uint32 add_time = YEAR;
 
             SetEventValue(charInfo.guid, "add", 1, add_time);
             SetEventValue(charInfo.guid, "logout", 0, 0);
@@ -1506,8 +1507,7 @@ bool RandomPlayerbotMgr::ProcessBot(uint32 bot)
                   player->GetLevel(), player->GetName().c_str());
         LogoutPlayerBot(botGUID);
         currentBots.erase(bot);
-        SetEventValue(bot, "logout", 1,
-                      urand(sPlayerbotAIConfig.minRandomBotInWorldTime, sPlayerbotAIConfig.maxRandomBotInWorldTime));
+        SetEventValue(bot, "logout", 1, DAY);
         return true;
     }
 
@@ -1538,7 +1538,7 @@ bool RandomPlayerbotMgr::ProcessBot(Player* bot)
                 urand(sPlayerbotAIConfig.minRandomBotReviveTime, sPlayerbotAIConfig.maxRandomBotReviveTime);
             LOG_DEBUG("playerbots", "Mark bot {} as dead, will be revived in {}s.", bot->GetName().c_str(),
                       randomTime);
-            SetEventValue(botId, "dead", 1, sPlayerbotAIConfig.maxRandomBotInWorldTime);
+            SetEventValue(botId, "dead", 1, DAY);
             SetEventValue(botId, "revive", 1, randomTime);
             return false;
         }
@@ -1983,37 +1983,34 @@ void RandomPlayerbotMgr::RandomizeFirst(Player* bot)
     if (sPlayerbotAIConfig.downgradeMaxLevelBot && bot->GetLevel() >= sPlayerbotAIConfig.randomBotMaxLevel)
     {
         if (bot->getClass() == CLASS_DEATH_KNIGHT)
-        {
             level = sWorld->getIntConfig(CONFIG_START_HEROIC_PLAYER_LEVEL);
-        }
         else
-        {
             level = sPlayerbotAIConfig.randomBotMinLevel;
-        }
     }
     else
     {
+        // Roll for the top or the bottom of the level range, otherwise land anywhere in between.
+        float maxLevelChance = sPlayerbotAIConfig.randomBotMaxLevelChance;
+        float minLevelChance = sPlayerbotAIConfig.randomBotMinLevelChance;
         uint32 roll = urand(1, 100);
-        if (roll <= 100 * sPlayerbotAIConfig.randomBotMaxLevelChance)
-        {
+
+        if (roll <= 100 * maxLevelChance)
             level = maxLevel;
-        }
-        else if (roll <=
-                 (100 * (sPlayerbotAIConfig.randomBotMaxLevelChance + sPlayerbotAIConfig.randomBotMinLevelChance)))
-        {
+        else if (roll <= 100 * (maxLevelChance + minLevelChance))
             level = minLevel;
-        }
         else
-        {
             level = urand(minLevel, maxLevel);
-        }
     }
 
     if (sPlayerbotAIConfig.disableRandomLevels)
     {
-        level = bot->getClass() == CLASS_DEATH_KNIGHT ? std::max(sPlayerbotAIConfig.randombotStartingLevel,
-                                                                 sWorld->getIntConfig(CONFIG_START_HEROIC_PLAYER_LEVEL))
-                                                      : sPlayerbotAIConfig.randombotStartingLevel;
+        // Death knights cannot exist below the heroic starting level.
+        if (bot->getClass() == CLASS_DEATH_KNIGHT)
+            level = std::max(sPlayerbotAIConfig.randombotStartingLevel,
+                             sWorld->getIntConfig(CONFIG_START_HEROIC_PLAYER_LEVEL));
+
+        else
+            level = sPlayerbotAIConfig.randombotStartingLevel;
     }
 
     SetValue(bot, "level", level);
@@ -2022,8 +2019,6 @@ void RandomPlayerbotMgr::RandomizeFirst(Player* bot)
 
     uint32 randomTime =
         urand(sPlayerbotAIConfig.minRandomBotRandomizeTime, sPlayerbotAIConfig.maxRandomBotRandomizeTime);
-    uint32 inworldTime =
-        urand(sPlayerbotAIConfig.minRandomBotInWorldTime, sPlayerbotAIConfig.maxRandomBotInWorldTime);
 
     PlayerbotsDatabasePreparedStatement* stmt = PlayerbotsDatabase.GetPreparedStatement(PLAYERBOTS_UPD_RANDOM_BOTS);
     stmt->SetData(0, randomTime);
@@ -2032,7 +2027,7 @@ void RandomPlayerbotMgr::RandomizeFirst(Player* bot)
     PlayerbotsDatabase.Execute(stmt);
 
     stmt = PlayerbotsDatabase.GetPreparedStatement(PLAYERBOTS_UPD_RANDOM_BOTS);
-    stmt->SetData(0, inworldTime);
+    stmt->SetData(0, DAY);
     stmt->SetData(1, "logout");
     stmt->SetData(2, bot->GetGUID().GetCounter());
     PlayerbotsDatabase.Execute(stmt);
@@ -2063,8 +2058,6 @@ void RandomPlayerbotMgr::RandomizeMin(Player* bot)
 
     uint32 randomTime =
         urand(sPlayerbotAIConfig.minRandomBotRandomizeTime, sPlayerbotAIConfig.maxRandomBotRandomizeTime);
-    uint32 inworldTime =
-        urand(sPlayerbotAIConfig.minRandomBotInWorldTime, sPlayerbotAIConfig.maxRandomBotInWorldTime);
 
     PlayerbotsDatabasePreparedStatement* stmt = PlayerbotsDatabase.GetPreparedStatement(PLAYERBOTS_UPD_RANDOM_BOTS);
     stmt->SetData(0, randomTime);
@@ -2073,7 +2066,7 @@ void RandomPlayerbotMgr::RandomizeMin(Player* bot)
     PlayerbotsDatabase.Execute(stmt);
 
     stmt = PlayerbotsDatabase.GetPreparedStatement(PLAYERBOTS_UPD_RANDOM_BOTS);
-    stmt->SetData(0, inworldTime);
+    stmt->SetData(0, DAY);
     stmt->SetData(1, "logout");
     stmt->SetData(2, bot->GetGUID().GetCounter());
     PlayerbotsDatabase.Execute(stmt);
@@ -2424,7 +2417,7 @@ std::string RandomPlayerbotMgr::GetData(uint32 bot, std::string const& type) { r
 
 void RandomPlayerbotMgr::SetValue(uint32 bot, std::string const& type, uint32 value, std::string const& data)
 {
-    SetEventValue(bot, type, value, sPlayerbotAIConfig.maxRandomBotInWorldTime, data);
+    SetEventValue(bot, type, value, DAY, data);
 }
 
 void RandomPlayerbotMgr::SetValue(Player* bot, std::string const& type, uint32 value, std::string const& data)
@@ -3016,7 +3009,7 @@ void RandomPlayerbotMgr::SetTradeDiscount(Player* bot, Player* master, uint32 va
 
     std::ostringstream name;
     name << "trade_discount_" << masterId;
-    SetEventValue(botId, name.str(), value, sPlayerbotAIConfig.maxRandomBotInWorldTime);
+    SetEventValue(botId, name.str(), value, DAY);
 }
 
 uint32 RandomPlayerbotMgr::GetTradeDiscount(Player* bot, Player* master)
@@ -3069,7 +3062,7 @@ void RandomPlayerbotMgr::ChangeStrategy(Player* player)
         LOG_INFO("playerbots", "Changing strategy for bot #{} <{}> to RPG", bot, player->GetName().c_str());
         LOG_INFO("playerbots", "Bot #{} <{}>: sent to inn", bot, player->GetName().c_str());
         RandomTeleportForLevel(player);
-        SetEventValue(bot, "teleport", 1, sPlayerbotAIConfig.maxRandomBotInWorldTime);
+        SetEventValue(bot, "teleport", 1, sPlayerbotAIConfig.maxRandomBotTeleportInterval);
     }
 
     ScheduleChangeStrategy(bot);

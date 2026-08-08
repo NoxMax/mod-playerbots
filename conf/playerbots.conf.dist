@@ -1692,11 +1692,6 @@ AiPlayerbot.RandomBotUpdateInterval = 20
 AiPlayerbot.RandomBotCountChangeMinInterval = 1800
 AiPlayerbot.RandomBotCountChangeMaxInterval = 7200
 
-# Minimum and maximum seconds a randombot will stay online before logging out
-# Defaults: 600 (min), 28800 (max)
-AiPlayerbot.MinRandomBotInWorldTime = 600
-AiPlayerbot.MaxRandomBotInWorldTime = 28800
-
 # Some aspects of randombots are periodically randomized while they are logged in and idle,
 # including their inventories and, if EquipAndSpecPersistence is disabled, their equipment and specs.
 # This config sets the minimum and maximum seconds between such randomization events.
@@ -1722,10 +1717,6 @@ AiPlayerbot.MaxRandomBotReviveTime = 300
 # Defaults: 3600 (min), 18000 (max)
 AiPlayerbot.MinRandomBotTeleportInterval = 3600
 AiPlayerbot.MaxRandomBotTeleportInterval = 18000
-
-# Number of seconds bots flagged as permanent stay in the world (31,104,000 ≈ 1 year)
-# Default: 31104000
-AiPlayerbot.PermanentlyInWorldTime = 31104000
 
 #
 #
