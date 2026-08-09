@@ -37,6 +37,7 @@
 #include "RandomPlayerbotFactory.h"
 #include "ServerFacade.h"
 #include "SharedDefines.h"
+#include "Timer.h"
 #include "TravelMgr.h"
 #include "Unit.h"
 #include "World.h"
@@ -297,24 +298,41 @@ void RandomPlayerbotMgr::UpdateAIInternal(uint32 /*elapsed*/, bool /*minimal*/)
     }*/
 
     uint32 maxAllowedBotCount = GetEventValue(0, "bot_count");
-    if (sPlayerbotAIConfig.randomBotCountMode == 0)
+    switch (sPlayerbotAIConfig.randomBotCountMode)
     {
-        // Mode 0 (static): roll a count once at server start and hold it for the whole run.
-        if (!_staticBotCountRolled)
+        case 1:
+            // Mode 1 (variable): roll a count at server start and re-roll it every randomBotCountChangeMin/MaxInterval.
+            if (!maxAllowedBotCount || (maxAllowedBotCount < sPlayerbotAIConfig.minRandomBots ||
+                                        maxAllowedBotCount > sPlayerbotAIConfig.maxRandomBots))
+            {
+                maxAllowedBotCount = urand(sPlayerbotAIConfig.minRandomBots, sPlayerbotAIConfig.maxRandomBots);
+                SetEventValue(0, "bot_count", maxAllowedBotCount,
+                              urand(sPlayerbotAIConfig.randomBotCountChangeMinInterval,
+                                    sPlayerbotAIConfig.randomBotCountChangeMaxInterval));
+            }
+            break;
+        case 2:
         {
-            maxAllowedBotCount = urand(sPlayerbotAIConfig.minRandomBots, sPlayerbotAIConfig.maxRandomBots);
-            SetEventValue(0, "bot_count", maxAllowedBotCount, YEAR);
-            _staticBotCountRolled = true;
+            // Mode 2 (scheduled): population count is set according to a schedule from GetScheduledBotCount, that
+            // changes on a fixed timing, every randomBotCountChangeMinInterval.
+            time_t now = GameTime::GetGameTime().count();
+            if (now >= _nextScheduledCountUpdate)
+            {
+                maxAllowedBotCount = GetScheduledBotCount();
+                SetEventValue(0, "bot_count", maxAllowedBotCount, DAY);
+                _nextScheduledCountUpdate = now + sPlayerbotAIConfig.randomBotCountChangeMinInterval;
+            }
+            break;
         }
-    }
-    // Mode 1 (variable): roll a count at server start and re-roll it every randomBotCountChangeMin/MaxInterval.
-    else if (!maxAllowedBotCount || (maxAllowedBotCount < sPlayerbotAIConfig.minRandomBots ||
-                                     maxAllowedBotCount > sPlayerbotAIConfig.maxRandomBots))
-    {
-        maxAllowedBotCount = urand(sPlayerbotAIConfig.minRandomBots, sPlayerbotAIConfig.maxRandomBots);
-        SetEventValue(0, "bot_count", maxAllowedBotCount,
-                      urand(sPlayerbotAIConfig.randomBotCountChangeMinInterval,
-                            sPlayerbotAIConfig.randomBotCountChangeMaxInterval));
+        default:
+            // Mode 0 (static): roll a count once at server start and hold it for the whole run.
+            if (!_staticBotCountRolled)
+            {
+                maxAllowedBotCount = urand(sPlayerbotAIConfig.minRandomBots, sPlayerbotAIConfig.maxRandomBots);
+                SetEventValue(0, "bot_count", maxAllowedBotCount, YEAR);
+                _staticBotCountRolled = true;
+            }
+            break;
     }
 
     GetBots();
@@ -891,6 +909,37 @@ uint32 RandomPlayerbotMgr::RemoveRandomBots()
                   maxAllowedBotCount);
 
     return toLogout.size();
+}
+
+// Population target for RandomBotCountMode 2: a 24 hour cycle ramping from MinRandomBots at RandomBotCountMinTime
+// up to MaxRandomBots at RandomBotCountMaxTime, then back down. The target population count is calculated from the
+// clock at each interval, so the count is never desynced by a server shutdown/restart.
+uint32 RandomPlayerbotMgr::GetScheduledBotCount()
+{
+    uint32 minCount = sPlayerbotAIConfig.minRandomBots;
+    uint32 maxCount = sPlayerbotAIConfig.maxRandomBots;
+
+    // No variation if either of the min/max values are equal to each other.
+    if (sPlayerbotAIConfig.randomBotCountMinTime == sPlayerbotAIConfig.randomBotCountMaxTime || minCount == maxCount)
+        return maxCount;
+
+    // Timings are tracked by the second for accurate ramping.
+    std::tm localTime = Acore::Time::TimeBreakdown(GameTime::GetGameTime().count());
+    uint32 localTimeOfDay = localTime.tm_hour * HOUR + localTime.tm_min * MINUTE + localTime.tm_sec;
+    uint32 minCountTime = sPlayerbotAIConfig.randomBotCountMinTime * HOUR;
+    uint32 maxCountTime = sPlayerbotAIConfig.randomBotCountMaxTime * HOUR;
+
+    // Offsets run forward from minCountTime and wrap, so a maxCountTime earlier in the day needs no separate case.
+    uint32 sinceMinCount = (localTimeOfDay + DAY - minCountTime) % DAY;
+    uint32 riseDuration = (maxCountTime + DAY - minCountTime) % DAY;
+    uint32 fallDuration = DAY - riseDuration;
+
+    uint64 range = maxCount - minCount; // uint64, for a cursed server with more than 49710 bots.
+
+    if (sinceMinCount < riseDuration)
+        return static_cast<uint32>(minCount + range * sinceMinCount / riseDuration);
+
+    return static_cast<uint32>(maxCount - range * (sinceMinCount - riseDuration) / fallDuration);
 }
 
 void RandomPlayerbotMgr::LoadBattleMastersCache()

@@ -122,6 +122,8 @@ AiPlayerbot.DisabledWithoutRealPlayerLogoutDelay = 300
 #   0 = Static:     Fixed random count rolled once at server start, between Min/MaxRandomBots.
 #   1 = Variable:   Fluctuating random count rolled at server start, between Min/MaxRandomBots.
 #                   Re-rolled again at a time between RandomBotCountChangeMin/MaxInterval.
+#   2 = Scheduled:  Fluctuating time-cycled count, ranging from MinRandomBots at RandomBotCountMinTime,
+#                   to MaxRandomBots at RandomBotCountMaxTime.
 # When MinRandomBots = MaxRandomBots the count is constant and all modes behave identically.
 # Default: 0 (static)
 AiPlayerbot.RandomBotCountMode = 0
@@ -1687,10 +1689,18 @@ AiPlayerbot.FastReactInBG = 1
 # Default: 20
 AiPlayerbot.RandomBotUpdateInterval = 20
 
-# Minimum and maximum seconds before the manager re-evaluates and adjusts total randombot count
+# Minimum and maximum seconds before the randombot population count changes, when RandomBotCountMode = 1 or 2.
+# Bot count changes randomly at some random time between min and max interval value, when RandomBotCountMode = 1.
+# Bot count changes incrementally according to schedule, at every min interval value, when RandomBotCountMode = 2.
 # Defaults: 1800 (min), 7200 (max)
 AiPlayerbot.RandomBotCountChangeMinInterval = 1800
 AiPlayerbot.RandomBotCountChangeMaxInterval = 7200
+
+# Local server time of day when randombot population count is at minimum or maximum, when RandomBotCountMode = 2.
+# Range: Integer values from 0 to 23
+# Defaults: 5 (min), 20 (max)
+AiPlayerbot.RandomBotCountMinTime = 5
+AiPlayerbot.RandomBotCountMaxTime = 20
 
 # Some aspects of randombots are periodically randomized while they are logged in and idle,
 # including their inventories and, if EquipAndSpecPersistence is disabled, their equipment and specs.

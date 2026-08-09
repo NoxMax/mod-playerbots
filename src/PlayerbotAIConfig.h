@@ -161,6 +161,7 @@ public:
     uint32 minRandomBots, maxRandomBots;
     uint32 randomBotCountMode;
     uint32 randomBotUpdateInterval, randomBotCountChangeMinInterval, randomBotCountChangeMaxInterval;
+    uint32 randomBotCountMinTime, randomBotCountMaxTime;
     uint32 minRandomBotRandomizeTime, maxRandomBotRandomizeTime;
     uint32 minRandomBotChangeStrategyTime, maxRandomBotChangeStrategyTime;
     uint32 minRandomBotReviveTime, maxRandomBotReviveTime;
