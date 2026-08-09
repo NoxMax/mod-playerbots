@@ -20,6 +20,7 @@
 #include <cctype>
 #include <iostream>
 #include <sstream>
+#include <utility>
 
 template <class T>
 void LoadList(std::string const value, T& list)
@@ -240,8 +241,17 @@ bool PlayerbotAIConfig::Initialize()
 
     botAutologin = sConfigMgr->GetOption<bool>("AiPlayerbot.BotAutologin", false);
     randomBotAutologin = sConfigMgr->GetOption<bool>("AiPlayerbot.RandomBotAutologin", true);
+
     minRandomBots = sConfigMgr->GetOption<int32>("AiPlayerbot.MinRandomBots", 500);
     maxRandomBots = sConfigMgr->GetOption<int32>("AiPlayerbot.MaxRandomBots", 500);
+    if (minRandomBots > maxRandomBots)
+    {
+        LOG_ERROR("server.loading",
+                  "AiPlayerbot.MinRandomBots ({}) is higher than AiPlayerbot.MaxRandomBots ({}). Swapping them.",
+                  minRandomBots, maxRandomBots);
+        std::swap(minRandomBots, maxRandomBots);
+    }
+
     randomBotCountMode = sConfigMgr->GetOption<uint32>("AiPlayerbot.RandomBotCountMode", 0);
     randomBotUpdateInterval = sConfigMgr->GetOption<int32>("AiPlayerbot.RandomBotUpdateInterval", 20);
     randomBotCountChangeMinInterval =
