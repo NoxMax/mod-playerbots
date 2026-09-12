@@ -835,7 +835,7 @@ bool RandomPlayerbotMgr::IsRemovableBot(Player* bot)
 
     // Controlled by a real player. IsRandomBot is not enough if a real player is logged into a randombot.
     if (PlayerbotAI* botAI = GET_PLAYERBOT_AI(bot))
-        if (botAI->HasRealPlayerMaster())
+        if (botAI->HasGameClientMaster())
             return false;
 
     // Grouped with a real player. (PR #2592 may fold this into the master check above.)
